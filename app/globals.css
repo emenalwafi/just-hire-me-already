@@ -5,11 +5,76 @@
   --foreground: #171717;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+@theme {
+  --color-neutral-10: #FFFFFF;
+  --color-neutral-20: #FAFAFA;
+  --color-neutral-30: #EDEDED;
+  --color-neutral-40: #E0E0E0;
+  --color-neutral-50: #C2C2C2;
+  --color-neutral-60: #9E9E9E;
+  --color-neutral-70: #757575;
+  --color-neutral-80: #616161;
+  --color-neutral-90: #404040;
+  --color-neutral-100: #1D1F20;
+
+  --color-primary-main: #01959F;
+  --color-primary-surface: #F3FBFC;
+  --color-primary-border: #4DB5BC;
+  --color-primary-hover: #01777F;
+  --color-primary-pressed: #01595F;
+  --color-primary-focus: #01959F;
+
+  --color-secondary-main: #FBC037;
+  --color-secondary-surface: #FFFCF5;
+  --color-secondary-border: #FEEABC;
+  --color-secondary-hover: #F8A92F;
+  --color-secondary-pressed: #FA9810;
+  --color-secondary-focus: #FBC037;
+
+  --color-danger-main: #E01428;
+  --color-danger-surface: #FFF9FA;
+  --color-danger-border: #F5B1B7;
+  --color-danger-hover: #BC1121;
+  --color-danger-pressed: #700A14;
+  --color-danger-focus: #E01428;
+
+  --color-warning-main: #CA7336;
+  --color-warning-surface: #FCF7F3;
+  --color-warning-border: #FEB17B;
+  --color-warning-hover: #B1652F;
+  --color-warning-pressed: #985628;
+  --color-warning-focus: #CA7336;
+
+  --color-success-main: #43936C;
+  --color-success-surface: #F7F7F7;
+  --color-success-border: #B8DBCA;
+  --color-success-hover: #367A59;
+  --color-success-pressed: #20573D;
+  --color-success-focus: #731912;
+
+  --text-xs: 10px;
+  --text-xs--line-height: 16px;
+
+  --text-sm: 12px;
+  --text-sm--line-height: 20px;
+
+  --text-base: 14px;
+  --text-base--line-height: 24px;
+
+  --text-lg: 16px;
+  --text-lg--line-height: 28px;
+
+  --text-heading-sm: 20px;
+  --text-heading-sm--line-height: 32px;
+
+  --text-heading-base: 24px;
+  --text-heading-base--line-height: 36px;
+
+  --text-heading-lg: 32px;
+  --text-heading-lg--line-height: 44px;
+
+  --text-display: 48px;
+  --text-display--line-height: 64px;
 }
 
 @media (prefers-color-scheme: dark) {
