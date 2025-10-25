@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import Chip from '@/components/chip/Chip';
+import DatePicker from '@/components/date-picker/DatePicker';
 
 export default function Home() {
   const [selectedChip, setSelectedChip] = useState<string | null>('rest');
+    const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   return (
     <div className="p-8 space-y-8">
@@ -44,6 +46,34 @@ export default function Home() {
           <Chip disabled>Disabled Option</Chip>
         </div>
       </div>
+
+<section className="mb-8">
+        <h2 className="text-heading-s font-bold text-neutral-80 mb-4">
+          DatePicker Component
+        </h2>
+        <div className="p-6 bg-white rounded-lg shadow-sm border border-neutral-30">
+          <h3 className="text-l font-bold mb-3">Interactive Example</h3>
+          <p className="text-m text-neutral-70 mb-4">
+            Selected date: {selectedDate ? selectedDate : 'None'}
+          </p>
+          <div className="w-full max-w-xs">
+            <DatePicker
+              value={selectedDate}
+              onChange={(date) => setSelectedDate(date)}
+            />
+          </div>
+
+          <h3 className="text-l font-bold mt-6 mb-3">Disabled State</h3>
+          <div className="w-full max-w-xs">
+            <DatePicker
+              value={null}
+              onChange={() => {}}
+              placeholder="You can't click me"
+              disabled
+            />
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

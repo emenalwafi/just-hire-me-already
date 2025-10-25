@@ -59,7 +59,7 @@ const Chip: React.FC<ChipProps> = ({
   const chipBaseClasses =
     "px-3 py-1 rounded-2xl outline outline-1 outline-offset-[-1px] flex justify-start items-center gap-2 overflow-hidden transition-all";
   const textBaseClasses =
-    "justify-center text-sm font-sans font-normal leading-6";
+    "justify-center text-base font-sans";
 
   // --- State-Specific Classes ---
   let chipStateClasses = "";
