@@ -28,7 +28,6 @@ import {
   isToday,
   parseISO,
   isValid,
-  set,
   getMonth,
   getYear,
   setMonth,
@@ -36,7 +35,6 @@ import {
   startOfDecade,
   endOfDecade,
   eachYearOfInterval,
-  isSameYear,
   startOfYear,
   startOfDay,
   isBefore,
@@ -45,78 +43,156 @@ import {
   min,
 } from "date-fns";
 
-// Props for the hook
+/**
+ * Props for the useDatePickerPopover hook.
+ */
 interface UseDatePickerPopoverProps {
+  /** The currently selected date as an ISO 8601 string (e.g., "yyyy-MM-dd") or null. */
   value: string | null;
+  /** Callback function triggered when a new date is selected, passing the date as an ISO string. */
   onChange: (date: string) => void;
+  /** Optional minimum selectable date as an ISO string. */
   minDateProp?: string;
+  /** Optional maximum selectable date as an ISO string. */
   maxDateProp?: string;
-  triggerRef: React.RefObject<HTMLButtonElement | null>; // Pass triggerRef for positioning
+  /** Ref to the trigger element (e.g., button) to position the popover against. */
+  triggerRef: React.RefObject<HTMLButtonElement | null>;
 }
 
-// Return type of the hook
+/**
+ * Return type of the useDatePickerPopover hook.
+ */
 interface UseDatePickerPopoverReturn {
+  /** Whether the popover is currently open. */
   isOpen: boolean;
+  /** Function to set the popover's open state. */
   setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  popoverElement: React.ReactPortal | null; // The popover JSX to render
-  selectedDate: Date | null; // Expose parsed selectedDate
-  currentDate: Date; // Expose current view date
-  containerRef: React.RefObject<HTMLDivElement | null>; // Correct type: RefObject<T> implies .current can be null
+  /** The popover's JSX element (or null) to be rendered via React Portal. */
+  popoverElement: React.ReactPortal | null;
+  /** The parsed and bounded selected date object. */
+  selectedDate: Date | null;
+  /** The date object representing the current calendar view (e.g., month/year). */
+  currentDate: Date;
+  /** The Ref representing the main parents container. */
+  containerRef: React.RefObject<HTMLDivElement | null>;
 }
 
+/**
+ * A custom hook to manage the state, logic, and rendering of a date picker popover.
+ * It handles date calculations, view navigation (day, month, year, decade),
+ * and popover positioning.
+ *
+ * @param {UseDatePickerPopoverProps} props - The props for the hook.
+ * @returns {UseDatePickerPopoverReturn} - The state and elements to control the date picker.
+ */
 export function useDatePickerPopover({
   value,
   onChange,
   minDateProp,
   maxDateProp,
-  triggerRef, // Receive triggerRef from the component
+  triggerRef,
 }: UseDatePickerPopoverProps): UseDatePickerPopoverReturn {
-  // --- Parse Min/Max Date Props ---
+  // --- Date Prop Parsing ---
+
+  /** Memoized `Date` object for the minimum selectable date, set to start of day. */
   const minDate = useMemo(() => {
     if (!minDateProp) return null;
     const parsed = parseISO(minDateProp);
     return isValid(parsed) ? startOfDay(parsed) : null;
   }, [minDateProp]);
 
+  /** Memoized `Date` object for the maximum selectable date, set to start of day. */
   const maxDate = useMemo(() => {
     if (!maxDateProp) return null;
     const parsed = parseISO(maxDateProp);
     return isValid(parsed) ? startOfDay(parsed) : null;
   }, [maxDateProp]);
 
+  // --- State and Refs ---
+
+  /** State for controlling the popover's visibility. */
   const [isOpen, setIsOpen] = useState(false);
-  const popoverRef = useRef<HTMLDivElement>(null); // Ref for the popover itself
-  const containerRef = useRef<HTMLDivElement>(null); // Ref for the main component wrapper
+  /** Ref for the popover `div` element, used for click-outside detection. */
+  const popoverRef = useRef<HTMLDivElement>(null);
+  /** Ref for the main component wrapper `div` element, used for click-outside detection. */
+  const containerRef = useRef<HTMLDivElement>(null);
+  /** State for the popover's absolute position (top, left). */
   const [popoverPosition, setPopoverPosition] = useState<{
     top: number;
     left: number;
   } | null>(null);
 
+  /** Memoized `Date` object for the selected `value`, bounded by min/max dates. */
   const selectedDate = useMemo(() => {
     if (!value) return null;
     const parsed = parseISO(value);
     if (isValid(parsed)) {
+      // Ensure the selected date isn't before minDate or after maxDate
       const bounded = minDate && isBefore(parsed, minDate) ? minDate : parsed;
       return maxDate && isAfter(bounded, maxDate) ? maxDate : bounded;
     }
     return null;
   }, [value, minDate, maxDate]);
 
+  /**
+   * Calculates the initial date for the calendar view, bounded by min/max dates.
+   * Prefers the `selectedDate` if available, otherwise defaults to today.
+   */
   const getBoundedInitialDate = useCallback(() => {
     const initial = selectedDate || new Date();
     const afterMin = minDate ? max([initial, minDate]) : initial;
     return maxDate ? min([afterMin, maxDate]) : afterMin;
   }, [selectedDate, minDate, maxDate]);
 
+  /** State for the date the calendar is currently displaying (e.g., the month/year being viewed). */
   const [currentDate, setCurrentDate] = useState(getBoundedInitialDate());
+  /** State for the current calendar view ('day', 'month', 'year', 'decade'). */
   const [view, setView] = useState<"day" | "month" | "year" | "decade">("day");
 
-  // Ensure currentDate stays within bounds if min/maxDate change
+  // --- Effects ---
+
+  /** Effect to reset the `currentDate` if min/max boundaries change. */
   useEffect(() => {
     setCurrentDate(getBoundedInitialDate());
   }, [minDate, maxDate, getBoundedInitialDate]);
 
+  /** Effect to calculate and set the popover's position when it opens. */
+  useEffect(() => {
+    if (isOpen && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setPopoverPosition({
+        top: rect.bottom + window.scrollY + 8, // 8px gap
+        left: rect.left + window.scrollX,
+      });
+    } else {
+      setPopoverPosition(null);
+    }
+  }, [isOpen, triggerRef]);
+
+  /** Effect to handle clicks outside the popover and trigger to close it. */
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        isOpen &&
+        triggerRef.current &&
+        !triggerRef.current.contains(event.target as Node) &&
+        popoverRef.current &&
+        !popoverRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isOpen, triggerRef, popoverRef]);
+
+  // --- Constants ---
+
+  /** Abbreviated days of the week for the calendar header. */
   const daysOfWeek = ["S", "M", "T", "W", "T", "F", "S"];
+  /** Abbreviated months of the year for the month view. */
   const monthsOfYear = [
     "Jan",
     "Feb",
@@ -132,7 +208,9 @@ export function useDatePickerPopover({
     "Dec",
   ];
 
-  // --- Date Calculations ---
+  // --- Date Calculations for Views ---
+
+  /** Memoized 2D array of `Date` objects for the 'day' view grid. */
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentDate);
     const monthEnd = endOfMonth(currentDate);
@@ -146,9 +224,11 @@ export function useDatePickerPopover({
     return rows;
   }, [currentDate]);
 
+  /** Memoized 2D array of `Date` objects for the 'year' view grid (12 years). */
   const calendarYears = useMemo(() => {
     const decadeStart = startOfDecade(currentDate);
     const decadeEnd = endOfDecade(currentDate);
+    // Get 12 years: 1 before decade, 10 for decade, 1 after
     const years = eachYearOfInterval({
       start: subYears(decadeStart, 1),
       end: addYears(decadeEnd, 1),
@@ -160,10 +240,11 @@ export function useDatePickerPopover({
     return rows;
   }, [currentDate]);
 
+  /** Memoized 2D array of decade objects (`{start, end}`) for the 'decade' view grid. */
   const calendarDecades = useMemo(() => {
-    // const currentYear = getYear(currentDate); // Not needed here
     const currentDecadeStartYear = getYear(startOfDecade(currentDate));
-    const startDecadeYear = currentDecadeStartYear - 40;
+    // Calculate a block of 12 decades centered around the current one
+    const startDecadeYear = currentDecadeStartYear - 40; // 4 decades before
     const decades = [];
     for (let i = 0; i < 12; i++) {
       const decadeStart = startDecadeYear + i * 10;
@@ -174,19 +255,23 @@ export function useDatePickerPopover({
       rows.push(decades.slice(i, i + 3));
     }
     return rows;
-  }, [currentDate]); // Dependency on currentDate is correct
+  }, [currentDate]);
 
+  /** The start year of the decade currently being viewed (e.g., 2020). */
   const currentViewDecadeStart = getYear(startOfDecade(currentDate));
+  /** The end year of the decade currently being viewed (e.g., 2029). */
   const currentViewDecadeEnd = getYear(endOfDecade(currentDate));
 
+  /** Helper to get the full range of decades being displayed for the header. */
   const displayedDecadesFlat = calendarDecades.flat();
   const decadeViewHeaderStart =
-    displayedDecadesFlat[0]?.start ?? getYear(currentDate); // Fallback to current year
+    displayedDecadesFlat[0]?.start ?? getYear(currentDate);
   const decadeViewHeaderEnd =
     displayedDecadesFlat[displayedDecadesFlat.length - 1]?.end ??
-    getYear(currentDate) + 9; // Fallback based on current year
+    getYear(currentDate) + 9;
 
   // --- Navigation Disable Logic ---
+
   const canGoPrevMonth =
     !minDate || isAfter(startOfMonth(currentDate), minDate);
   const canGoPrevYear = !minDate || getYear(currentDate) > getYear(minDate);
@@ -200,7 +285,9 @@ export function useDatePickerPopover({
   const canGoNextDecadeBlock =
     !maxDate || currentViewDecadeEnd + 100 <= getYear(maxDate);
 
-  // --- Handlers ---
+  // --- Click Handlers ---
+
+  /** Handles selecting a day. Closes popover and sets view to 'day'. */
   const handleDayClick = useCallback(
     (day: Date) => {
       const dayStart = startOfDay(day);
@@ -216,6 +303,7 @@ export function useDatePickerPopover({
     [minDate, maxDate, onChange]
   );
 
+  /** Handles selecting a month. Sets view to 'day'. */
   const handleMonthClick = useCallback(
     (monthIndex: number) => {
       const targetMonthStart = startOfMonth(setMonth(currentDate, monthIndex));
@@ -224,6 +312,7 @@ export function useDatePickerPopover({
         (!maxDate || !isAfter(targetMonthStart, maxDate))
       ) {
         let targetDate = setMonth(currentDate, monthIndex);
+        // Bound the date to min/max if necessary
         if (minDate && isBefore(targetDate, minDate)) targetDate = minDate;
         if (maxDate && isAfter(targetDate, maxDate)) targetDate = maxDate;
         setCurrentDate(targetDate);
@@ -233,6 +322,7 @@ export function useDatePickerPopover({
     [currentDate, minDate, maxDate]
   );
 
+  /** Handles selecting a year. Sets view to 'month'. */
   const handleYearClick = useCallback(
     (year: number) => {
       if (
@@ -249,6 +339,7 @@ export function useDatePickerPopover({
     [currentDate, minDate, maxDate]
   );
 
+  /** Handles selecting a decade. Sets view to 'year'. */
   const handleDecadeClick = useCallback(
     (decadeStartYear: number) => {
       const decadeEndYear = decadeStartYear + 9;
@@ -256,6 +347,7 @@ export function useDatePickerPopover({
         (!minDate || decadeEndYear >= getYear(minDate)) &&
         (!maxDate || decadeStartYear <= getYear(maxDate))
       ) {
+        // Target the start of the decade, but bounded by min/max
         let targetYear = decadeStartYear;
         if (minDate && targetYear < getYear(minDate))
           targetYear = getYear(minDate);
@@ -274,6 +366,7 @@ export function useDatePickerPopover({
   );
 
   // --- Navigation Functions ---
+
   const goToNextMonth = useCallback(
     () => canGoNextMonth && setCurrentDate(addMonths(currentDate, 1)),
     [canGoNextMonth, currentDate]
@@ -307,40 +400,13 @@ export function useDatePickerPopover({
     [canGoPrevDecadeBlock, currentDate]
   );
 
-  // --- Calculate Popover Position ---
-  useEffect(() => {
-    if (isOpen && triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect();
-      setPopoverPosition({
-        top: rect.bottom + window.scrollY + 8,
-        left: rect.left + window.scrollX,
-      });
-    } else {
-      setPopoverPosition(null);
-    }
-  }, [isOpen, triggerRef]);
+  // --- Helpers ---
 
-  // --- Close on Outside Click (Now handles outside the component's main div) ---
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      // Check triggerRef and popoverRef
-      if (
-        isOpen &&
-        triggerRef.current &&
-        !triggerRef.current.contains(event.target as Node) &&
-        popoverRef.current &&
-        !popoverRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [isOpen, triggerRef, popoverRef]);
-
-  // Helper to get button classes based on disabled state
+  /**
+   * Helper function to get the appropriate Tailwind classes for a navigation button.
+   * @param {boolean} isDisabled - Whether the button should be in a disabled state.
+   * @returns {string} - A string of Tailwind classes.
+   */
   const getNavButtonClasses = (isDisabled: boolean) => {
     return `p-1 rounded-full cursor-pointer ${
       isDisabled
@@ -350,7 +416,8 @@ export function useDatePickerPopover({
   };
 
   // --- Popover JSX ---
-  // Memoize popover content to avoid unnecessary re-renders when only position changes
+
+  /** Memoized JSX for the popover's content. */
   const popoverElementInternal = useMemo(() => {
     if (!isOpen || !popoverPosition) return null;
 
@@ -359,6 +426,7 @@ export function useDatePickerPopover({
         ref={popoverRef}
         role="dialog"
         aria-modal="true"
+        aria-label="Date Picker"
         style={{
           position: "absolute",
           top: `${popoverPosition.top}px`,
@@ -538,7 +606,8 @@ export function useDatePickerPopover({
                   >
                     {day}
                   </div>
-                ))}{" "}
+                ))}
+                <div className="w-0"></div>
               </div>{" "}
               {calendarDays.map((row, rowIndex) => (
                 <div
@@ -556,9 +625,11 @@ export function useDatePickerPopover({
                       !isCurrentMonth ||
                       (minDate && isBefore(dayStart, minDate)) ||
                       (maxDate && isAfter(dayStart, maxDate));
+
                     let dayTextClasses = "text-base font-normal";
                     let dayButtonClasses =
                       "cursor-pointer w-10 h-10 p-2 flex justify-center items-center gap-2 rounded-full transition-colors focus:outline-none focus:ring-1 focus:ring-primary-focus";
+
                     if (isDisabledDay) {
                       dayTextClasses += " text-neutral-60";
                       dayButtonClasses +=
@@ -575,6 +646,7 @@ export function useDatePickerPopover({
                       dayTextClasses += " text-neutral-90";
                       dayButtonClasses += " bg-neutral-10 hover:bg-neutral-20";
                     }
+
                     return (
                       <button
                         type="button"
@@ -614,6 +686,7 @@ export function useDatePickerPopover({
                 const isDisabledMonth =
                   (minDate && isBefore(targetMonthEnd, minDate)) ||
                   (maxDate && isAfter(targetMonthStart, maxDate));
+
                 let monthButtonClasses = `cursor-pointer flex-1 h-10 p-2 rounded-lg flex justify-center items-center gap-2 transition-colors focus:outline-none focus:ring-1 focus:ring-primary-focus`;
                 if (isDisabledMonth) {
                   monthButtonClasses +=
@@ -625,6 +698,7 @@ export function useDatePickerPopover({
                   monthButtonClasses +=
                     " bg-neutral-10 text-neutral-90 hover:bg-neutral-20";
                 }
+
                 return (
                   <button
                     key={monthIndex}
@@ -663,30 +737,37 @@ export function useDatePickerPopover({
                   (!minDate || year >= getYear(minDate)) &&
                   (!maxDate || year <= getYear(maxDate));
                 let isDisabled = !isCurrentDecadeYear || !isSelectableYear;
+
                 let yearButtonClasses = `cursor-pointer flex-1 h-10 p-2 rounded-lg flex justify-center items-center gap-2 transition-colors focus:outline-none focus:ring-1 focus:ring-primary-focus`;
                 let yearTextClasses = "text-center text-base";
+
                 if (!isSelectableYear) {
+                  // Not selectable, but could be outside current decade
                   if (maxDate && year > getYear(maxDate)) {
-                    yearTextClasses += " text-neutral-50";
+                    yearTextClasses += " text-neutral-50"; // Dimmer for future
                     yearButtonClasses +=
                       " bg-neutral-20 hover:bg-neutral-20 cursor-default";
                   } else {
-                    yearTextClasses += " text-neutral-60";
+                    yearTextClasses += " text-neutral-60"; // Standard disabled
                     yearButtonClasses +=
                       " bg-neutral-10 hover:bg-neutral-10 cursor-default";
                   }
                 } else if (!isCurrentDecadeYear) {
+                  // Selectable, but outside current decade view
                   yearTextClasses += " text-neutral-60";
                   yearButtonClasses +=
                     " bg-neutral-10 hover:bg-neutral-10 cursor-default";
                 } else if (isCurrentSelectedYear) {
+                  // Current selected year
                   yearTextClasses += " text-primary-main font-bold";
                   yearButtonClasses +=
                     " bg-primary-surface outline outline-1 outline-primary-border hover:bg-primary-surface";
                 } else {
+                  // Default selectable year
                   yearTextClasses += " text-neutral-90";
                   yearButtonClasses += " bg-neutral-10 hover:bg-neutral-20";
                 }
+
                 return (
                   <button
                     key={year}
@@ -719,8 +800,10 @@ export function useDatePickerPopover({
                 const isSelectableDecade =
                   (!minDate || decade.end >= getYear(minDate)) &&
                   (!maxDate || decade.start <= getYear(maxDate));
+
                 let decadeButtonClasses = `cursor-pointer flex-1 h-10 p-2 rounded-lg flex justify-center items-center gap-2 transition-colors focus:outline-none focus:ring-1 focus:ring-primary-focus text-center text-base `;
                 let isDisabled = !isSelectableDecade;
+
                 if (isCurrentDecadeRange && isSelectableDecade) {
                   decadeButtonClasses +=
                     " bg-primary-surface text-primary-main font-bold outline outline-1 outline-primary-border hover:bg-primary-surface";
@@ -737,6 +820,7 @@ export function useDatePickerPopover({
                   }
                   isDisabled = true;
                 }
+
                 return (
                   <button
                     key={decade.start}
@@ -755,13 +839,12 @@ export function useDatePickerPopover({
                     {`${decade.start}-${decade.end}`}{" "}
                   </button>
                 );
-              })}{" "}
+              })}
             </div>
           )}
         </div>
       </div>
     );
-    // Only create portal if document is available (prevents SSR errors) and popover should be open
   }, [
     isOpen,
     popoverPosition,
@@ -769,7 +852,7 @@ export function useDatePickerPopover({
     currentDate,
     selectedDate,
     minDate,
-    maxDate /* Include all dependencies used inside popover */,
+    maxDate,
     calendarDays,
     calendarYears,
     calendarDecades,
@@ -798,11 +881,12 @@ export function useDatePickerPopover({
     goToPrevDecadeBlock,
     goToNextDecadeBlock,
     setIsOpen,
-    setView /* Include setters if used inside */,
+    setView,
   ]);
 
-  // Portal creation logic moved outside the main component body
+  /** Creates the React Portal for the popover element. */
   const popoverPortal =
+    // Only create portal if document is available (prevents SSR errors)
     typeof document !== "undefined" && popoverElementInternal
       ? createPortal(popoverElementInternal, document.body)
       : null;
@@ -811,8 +895,8 @@ export function useDatePickerPopover({
     isOpen,
     setIsOpen,
     popoverElement: popoverPortal,
-    selectedDate, // Expose selectedDate if needed by consumer
-    currentDate, // Expose current view date if needed
-    containerRef, // Pass back containerRef for positioning logic in consumer
+    selectedDate,
+    currentDate,
+    containerRef,
   };
 }
