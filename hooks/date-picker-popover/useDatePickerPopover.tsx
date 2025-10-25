@@ -46,7 +46,7 @@ import {
 /**
  * Props for the useDatePickerPopover hook.
  */
-interface UseDatePickerPopoverProps {
+export interface UseDatePickerPopoverProps {
   /** The currently selected date as an ISO 8601 string (e.g., "yyyy-MM-dd") or null. */
   value: string | null;
   /** Callback function triggered when a new date is selected, passing the date as an ISO string. */
@@ -62,7 +62,7 @@ interface UseDatePickerPopoverProps {
 /**
  * Return type of the useDatePickerPopover hook.
  */
-interface UseDatePickerPopoverReturn {
+export interface UseDatePickerPopoverReturn {
   /** Whether the popover is currently open. */
   isOpen: boolean;
   /** Function to set the popover's open state. */
