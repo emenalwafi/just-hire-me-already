@@ -628,7 +628,7 @@ export function useDatePickerPopover({
 
                     let dayTextClasses = "text-base font-normal";
                     let dayButtonClasses =
-                      "cursor-pointer w-10 h-10 p-2 flex justify-center items-center gap-2 rounded-full transition-colors focus:outline-none focus:ring-1 focus:ring-primary-focus";
+                      "cursor-pointer w-10 h-6 p-2 flex justify-center items-center gap-2 rounded-lg transition-colors focus:outline-none focus:ring-1 focus:ring-primary-focus";
 
                     if (isDisabledDay) {
                       dayTextClasses += " text-neutral-60";
@@ -644,7 +644,7 @@ export function useDatePickerPopover({
                         " bg-neutral-20 hover:bg-neutral-30 outline outline-1 outline-neutral-40";
                     } else {
                       dayTextClasses += " text-neutral-90";
-                      dayButtonClasses += " bg-neutral-10 hover:bg-neutral-20";
+                      dayButtonClasses += " bg-neutral-10 hover:bg-neutral-40";
                     }
 
                     return (
