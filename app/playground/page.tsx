@@ -1,12 +1,18 @@
-"use client"
+"use client";
 
-import { useState } from 'react';
-import Chip from '@/components/chip/Chip';
-import DatePicker from '@/components/date-picker/DatePicker';
+import { useState } from "react";
+import Chip from "@/components/chip/Chip";
+import DatePicker from "@/components/date-picker/DatePicker";
 
 export default function Home() {
-  const [selectedChip, setSelectedChip] = useState<string | null>('rest');
-    const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedChip, setSelectedChip] = useState<string | null>("rest");
+  const [selectedDate1, setSelectedDate1] = useState<string | null>(null);
+  const [selectedDate2, setSelectedDate2] = useState<string | null>(
+    "2024-05-15"
+  ); // Example initial date
+  const [selectedDate3, setSelectedDate3] = useState<string | null>(
+    "2022-08-20"
+  ); // Example with bounds
 
   return (
     <div className="p-8 space-y-8">
@@ -20,57 +26,95 @@ export default function Home() {
       </div>
 
       <div>
-        <h2 className="text-xl font-sans font-bold mb-4">Interactive Example</h2>
+        <h2 className="text-xl font-sans font-bold mb-4">
+          Interactive Example
+        </h2>
         <p className="text-sm font-sans text-neutral-700 mb-4">
           Click a chip to select it.
         </p>
         <div className="flex flex-wrap gap-4">
           <Chip
-            selected={selectedChip === 'chip1'}
-            onClick={() => setSelectedChip('chip1')}
+            selected={selectedChip === "chip1"}
+            onClick={() => setSelectedChip("chip1")}
           >
             Option 1
           </Chip>
           <Chip
-            selected={selectedChip === 'chip2'}
-            onClick={() => setSelectedChip('chip2')}
+            selected={selectedChip === "chip2"}
+            onClick={() => setSelectedChip("chip2")}
           >
             Option 2
           </Chip>
           <Chip
-            selected={selectedChip === 'chip3'}
-            onClick={() => setSelectedChip('chip3')}
+            selected={selectedChip === "chip3"}
+            onClick={() => setSelectedChip("chip3")}
           >
             Option 3
           </Chip>
           <Chip disabled>Disabled Option</Chip>
         </div>
       </div>
-
-<section className="mb-8">
-        <h2 className="text-heading-s font-bold text-neutral-80 mb-4">
-          DatePicker Component
-        </h2>
-        <div className="p-6 bg-white rounded-lg shadow-sm border border-neutral-30">
-          <h3 className="text-l font-bold mb-3">Interactive Example</h3>
-          <p className="text-m text-neutral-70 mb-4">
-            Selected date: {selectedDate ? selectedDate : 'None'}
-          </p>
-          <div className="w-full max-w-xs">
+      {/* DatePicker Component Section */}
+      <section>
+        <h2 className="text-xl font-bold mb-4">DatePicker Component</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-start">
+          {/* Example 1: Basic DatePicker */}
+          <div>
+            <label className="block text-sm font-medium text-neutral-70 mb-1">
+              Basic DatePicker:
+            </label>
             <DatePicker
-              value={selectedDate}
-              onChange={(date) => setSelectedDate(date)}
+              value={selectedDate1}
+              onChange={setSelectedDate1}
+              placeholder="Select any date"
             />
+            <p className="text-xs text-neutral-60 mt-1">
+              Selected: {selectedDate1 || "None"}
+            </p>
           </div>
 
-          <h3 className="text-l font-bold mt-6 mb-3">Disabled State</h3>
-          <div className="w-full max-w-xs">
+          {/* Example 2: DatePicker with Initial Value */}
+          <div>
+            <label className="block text-sm font-medium text-neutral-70 mb-1">
+              With Initial Value:
+            </label>
+            <DatePicker value={selectedDate2} onChange={setSelectedDate2} />
+            <p className="text-xs text-neutral-60 mt-1">
+              Selected: {selectedDate2 || "None"}
+            </p>
+          </div>
+
+          {/* Example 3: DatePicker with Min/Max Dates */}
+          <div>
+            <label className="block text-sm font-medium text-neutral-70 mb-1">
+              Range (Aug 1, 2022 - Oct 31, 2023):
+            </label>
+            <DatePicker
+              value={selectedDate3}
+              onChange={setSelectedDate3}
+              minDate="2022-08-01" // Minimum selectable date
+              maxDate="2023-10-31" // Maximum selectable date
+              placeholder="Select date in range"
+            />
+            <p className="text-xs text-neutral-60 mt-1">
+              Selected: {selectedDate3 || "None"}
+            </p>
+          </div>
+
+          {/* Example 4: Disabled DatePicker */}
+          <div>
+            <label className="block text-sm font-medium text-neutral-70 mb-1">
+              Disabled DatePicker:
+            </label>
             <DatePicker
               value={null}
-              onChange={() => {}}
-              placeholder="You can't click me"
-              disabled
+              onChange={() => {}} // No-op
+              disabled={true}
+              placeholder="Cannot select"
             />
+            <p className="text-xs text-neutral-60 mt-1">
+              Selected: None (Disabled)
+            </p>
           </div>
         </div>
       </section>

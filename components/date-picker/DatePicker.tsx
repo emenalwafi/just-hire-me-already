@@ -20,17 +20,23 @@ import {
   isSameMonth,
   isSameDay,
   isToday,
-  parseISO,
-  set, // Import set function to change month/year
-  getMonth, // Import getMonth to check current month
-  getYear, // Import getYear
-  setMonth, // Import setMonth
-  setYear, // Import setYear
-  startOfDecade, // Import startOfDecade
-  endOfDecade, // Import endOfDecade
-  eachYearOfInterval, // Import eachYearOfInterval
-  isSameYear, // Import isSameYear
-  startOfYear, // Needed for decade view logic
+  parseISO, // Use parseISO for prop parsing
+  isValid, // Check if parsed date is valid
+  set,
+  getMonth,
+  getYear,
+  setMonth,
+  setYear,
+  startOfDecade,
+  endOfDecade,
+  eachYearOfInterval,
+  isSameYear,
+  startOfYear,
+  startOfDay,
+  isBefore, // Use isBefore for comparisons
+  isAfter, // Use isAfter for comparisons
+  max, // Use max for clamping dates
+  min, // Use min for clamping dates
 } from "date-fns";
 
 interface DatePickerProps {
@@ -42,6 +48,10 @@ interface DatePickerProps {
   placeholder?: string;
   /** Whether the date picker is disabled. */
   disabled?: boolean;
+  /** Optional minimum selectable date (ISO string 'yyyy-MM-dd'). */
+  minDate?: string;
+  /** Optional maximum selectable date (ISO string 'yyyy-MM-dd'). */
+  maxDate?: string;
 }
 
 const DatePicker: React.FC<DatePickerProps> = ({
@@ -49,10 +59,41 @@ const DatePicker: React.FC<DatePickerProps> = ({
   onChange,
   placeholder = "Select a date",
   disabled = false,
+  minDate: minDateProp,
+  maxDate: maxDateProp,
 }) => {
+  // --- Parse Min/Max Date Props ---
+  const minDate = useMemo(() => {
+    if (!minDateProp) return null;
+    const parsed = parseISO(minDateProp);
+    return isValid(parsed) ? startOfDay(parsed) : null; // Use startOfDay for accurate comparison
+  }, [minDateProp]);
+
+  const maxDate = useMemo(() => {
+    if (!maxDateProp) return null;
+    const parsed = parseISO(maxDateProp);
+    return isValid(parsed) ? startOfDay(parsed) : null; // Use startOfDay for accurate comparison
+  }, [maxDateProp]);
+
   const [isOpen, setIsOpen] = useState(false);
-  const selectedDate = value ? parseISO(value) : null;
-  const [currentDate, setCurrentDate] = useState(selectedDate || new Date()); // Represents the currently viewed date/time scope
+  const selectedDate = useMemo(() => {
+    if (!value) return null;
+    const parsed = parseISO(value);
+    // Ensure selected date is within bounds if bounds exist
+    if (isValid(parsed)) {
+      const bounded = minDate && isBefore(parsed, minDate) ? minDate : parsed;
+      return maxDate && isAfter(bounded, maxDate) ? maxDate : bounded;
+    }
+    return null;
+  }, [value, minDate, maxDate]);
+
+  // Ensure initial view date is within bounds
+  const getBoundedInitialDate = () => {
+    const initial = selectedDate || new Date();
+    const afterMin = minDate ? max([initial, minDate]) : initial;
+    return maxDate ? min([afterMin, maxDate]) : afterMin;
+  };
+  const [currentDate, setCurrentDate] = useState(getBoundedInitialDate());
   const [view, setView] = useState<"day" | "month" | "year" | "decade">("day"); // State for view mode
 
   const daysOfWeek = ["S", "M", "T", "W", "T", "F", "S"];
@@ -103,16 +144,11 @@ const DatePicker: React.FC<DatePickerProps> = ({
 
   const calendarDecades = useMemo(() => {
     const currentYear = getYear(currentDate);
-    // Calculate the start year of the 30-year block containing the current decade
-    // Adjusted logic: Center the 12 decades around the current decade's start
     const currentDecadeStartYear = getYear(startOfDecade(currentDate));
-    // Display roughly 4 decades before and 7 after, adjust as needed for centering
-    // Let's aim to have the current decade near the second row
     const startDecadeYear = currentDecadeStartYear - 40; // Start view 4 decades before current
 
     const decades = [];
     for (let i = 0; i < 12; i++) {
-      // Generate 12 decade ranges (4 rows of 3)
       const decadeStart = startDecadeYear + i * 10;
       decades.push({ start: decadeStart, end: decadeStart + 9 });
     }
@@ -124,60 +160,118 @@ const DatePicker: React.FC<DatePickerProps> = ({
     return rows;
   }, [currentDate]);
 
-  const currentDecadeStart = getYear(startOfDecade(new Date()));
-
-  const currentDecadeEnd = getYear(endOfDecade(new Date()));
-
-  const currentDecadeStartForYearOption = getYear(startOfDecade(currentDate));
-  const currentDecadeEndForYearOption = getYear(endOfDecade(currentDate));
+  const currentViewDecadeStart = getYear(startOfDecade(currentDate));
+  const currentViewDecadeEnd = getYear(endOfDecade(currentDate));
   const currentYear = getYear(currentDate);
-  // Calculate the start/end year of the 30-year block for the header
-  // Let's adjust header to show the range of decades actually displayed
+
+  // Header range calculation for Decade view
   const displayedDecadesFlat = calendarDecades.flat();
-  const decadeViewHeaderStart = displayedDecadesFlat[0]?.start ?? currentYear; // Use first decade displayed
+  const decadeViewHeaderStart = displayedDecadesFlat[0]?.start ?? currentYear;
   const decadeViewHeaderEnd =
     displayedDecadesFlat[displayedDecadesFlat.length - 1]?.end ??
-    currentYear + 9; // Use last decade displayed
+    currentYear + 9;
+
+  // --- Navigation Disable Logic ---
+  // Check if previous/next period start is before minDate or after maxDate
+  const canGoPrevMonth =
+    !minDate || isAfter(startOfMonth(currentDate), minDate);
+  const canGoPrevYear = !minDate || getYear(currentDate) > getYear(minDate);
+  const canGoNextMonth =
+    !maxDate || isBefore(startOfMonth(currentDate), startOfMonth(maxDate));
+  const canGoNextYear = !maxDate || getYear(currentDate) < getYear(maxDate);
+  const canGoPrevDecade = !minDate || currentViewDecadeStart > getYear(minDate);
+  const canGoNextDecade = !maxDate || currentViewDecadeEnd < getYear(maxDate);
+  // Allow block navigation unless min/max date restricts it significantly (optional, can be always true)
+  const canGoPrevDecadeBlock =
+    !minDate || currentViewDecadeStart - 100 >= getYear(minDate); // Simplified check
+  const canGoNextDecadeBlock =
+    !maxDate || currentViewDecadeEnd + 100 <= getYear(maxDate); // Simplified check
 
   // --- Handlers ---
   const handleDayClick = (day: Date) => {
-    onChange(format(day, "yyyy-MM-dd"));
-    setIsOpen(false);
-    setView("day"); // Reset view on selection
+    // Check if the clicked day is within the allowed range
+    const dayStart = startOfDay(day);
+    if (
+      (!minDate || !isBefore(dayStart, minDate)) &&
+      (!maxDate || !isAfter(dayStart, maxDate))
+    ) {
+      onChange(format(day, "yyyy-MM-dd"));
+      setIsOpen(false);
+      setView("day"); // Reset view on selection
+    }
   };
 
   const handleMonthClick = (monthIndex: number) => {
-    setCurrentDate(setMonth(currentDate, monthIndex));
-    setView("day"); // Switch back to day view after selecting month
+    const targetMonthStart = startOfMonth(setMonth(currentDate, monthIndex));
+    // Ensure the target month overlaps with the allowed range
+    if (
+      (!minDate || !isBefore(endOfMonth(targetMonthStart), minDate)) &&
+      (!maxDate || !isAfter(targetMonthStart, maxDate))
+    ) {
+      // Clamp the date if the current day doesn't exist in the target month/year bounds
+      let targetDate = setMonth(currentDate, monthIndex);
+      if (minDate && isBefore(targetDate, minDate)) targetDate = minDate;
+      if (maxDate && isAfter(targetDate, maxDate)) targetDate = maxDate;
+      setCurrentDate(targetDate);
+      setView("day"); // Switch back to day view after selecting month
+    }
   };
 
   const handleYearClick = (year: number) => {
-    // Only proceed if the year is within the allowed range
-    if (year >= 2000 && year <= 2029) {
-      setCurrentDate(setYear(currentDate, year));
-      setView("month"); // Switch back to month view after selecting year
+    // Ensure the target year overlaps with the allowed range
+    if (
+      (!minDate || year >= getYear(minDate)) &&
+      (!maxDate || year <= getYear(maxDate))
+    ) {
+      // Clamp the date if the current day/month doesn't exist in the target year bounds
+      let targetDate = setYear(currentDate, year);
+      if (minDate && isBefore(targetDate, minDate)) targetDate = minDate;
+      if (maxDate && isAfter(targetDate, maxDate)) targetDate = maxDate;
+      setCurrentDate(targetDate);
+      setView("month");
     }
   };
 
   const handleDecadeClick = (decadeStartYear: number) => {
-    // Only navigate if the clicked decade contains selectable years (2000-2029)
+    // Ensure the target decade overlaps with the allowed range
     const decadeEndYear = decadeStartYear + 9;
-    if (decadeEndYear >= 2000 && decadeStartYear <= 2029) {
-      // Adjust the target year if the decade is partially outside the selectable range
-      const targetYear = Math.max(decadeStartYear, 2000); // Ensure we land within 2000-2029
-      setCurrentDate(startOfYear(setYear(currentDate, targetYear)));
+    if (
+      (!minDate || decadeEndYear >= getYear(minDate)) &&
+      (!maxDate || decadeStartYear <= getYear(maxDate))
+    ) {
+      // Clamp the date to the start of the decade, bounded by min/max
+      let targetYear = decadeStartYear;
+      if (minDate && targetYear < getYear(minDate))
+        targetYear = getYear(minDate);
+      if (maxDate && targetYear > getYear(maxDate))
+        targetYear = getYear(maxDate); // Land on max year if decade starts after
+
+      let targetDate = startOfYear(setYear(currentDate, targetYear));
+      if (minDate && isBefore(targetDate, minDate)) targetDate = minDate;
+      if (maxDate && isAfter(targetDate, maxDate)) targetDate = maxDate;
+
+      setCurrentDate(targetDate);
       setView("year"); // Switch back to year view
     }
   };
 
-  const goToNextMonth = () => setCurrentDate(addMonths(currentDate, 1));
-  const goToPrevMonth = () => setCurrentDate(subMonths(currentDate, 1));
-  const goToNextYear = () => setCurrentDate(addYears(currentDate, 1));
-  const goToPrevYear = () => setCurrentDate(subYears(currentDate, 1));
-  const goToNextDecade = () => setCurrentDate(addYears(currentDate, 10));
-  const goToPrevDecade = () => setCurrentDate(subYears(currentDate, 10));
-  const goToNextDecadeBlock = () => setCurrentDate(addYears(currentDate, 100)); // Navigate by 100 years for decade block
-  const goToPrevDecadeBlock = () => setCurrentDate(subYears(currentDate, 100)); // Navigate by 100 years
+  // --- Navigation Functions ---
+  const goToNextMonth = () =>
+    canGoNextMonth && setCurrentDate(addMonths(currentDate, 1));
+  const goToPrevMonth = () =>
+    canGoPrevMonth && setCurrentDate(subMonths(currentDate, 1));
+  const goToNextYear = () =>
+    canGoNextYear && setCurrentDate(addYears(currentDate, 1));
+  const goToPrevYear = () =>
+    canGoPrevYear && setCurrentDate(subYears(currentDate, 1));
+  const goToNextDecade = () =>
+    canGoNextDecade && setCurrentDate(addYears(currentDate, 1)); // Navigate year view
+  const goToPrevDecade = () =>
+    canGoPrevDecade && setCurrentDate(subYears(currentDate, 10)); // Navigate year view
+  const goToNextDecadeBlock = () =>
+    canGoNextDecadeBlock && setCurrentDate(addYears(currentDate, 100)); // Navigate decade view
+  const goToPrevDecadeBlock = () =>
+    canGoPrevDecadeBlock && setCurrentDate(subYears(currentDate, 100)); // Navigate decade view
 
   // --- Button & Input Styling ---
   const triggerClasses = `
@@ -192,6 +286,15 @@ const DatePicker: React.FC<DatePickerProps> = ({
         : "hover:border-neutral-60"
     }
   `;
+
+  // Helper to get button classes based on disabled state
+  const getNavButtonClasses = (isDisabled: boolean) => {
+    return `p-1 rounded-full ${
+      isDisabled
+        ? "text-neutral-60 cursor-not-allowed"
+        : "text-neutral-100 hover:bg-neutral-20"
+    }`;
+  };
 
   return (
     <div className="relative inline-block w-full max-w-xs">
@@ -231,9 +334,18 @@ const DatePicker: React.FC<DatePickerProps> = ({
                     ? goToPrevDecadeBlock
                     : view === "year"
                     ? goToPrevDecade
-                    : goToPrevYear
+                    : goToPrevYear // Day and Month views use PrevYear
                 }
-                className="p-1 rounded-full hover:bg-neutral-20"
+                disabled={
+                  (view === "decade" && !canGoPrevDecadeBlock) ||
+                  (view === "year" && !canGoPrevDecade) ||
+                  ((view === "day" || view === "month") && !canGoPrevYear)
+                }
+                className={getNavButtonClasses(
+                  (view === "decade" && !canGoPrevDecadeBlock) ||
+                    (view === "year" && !canGoPrevDecade) ||
+                    ((view === "day" || view === "month") && !canGoPrevYear)
+                )}
                 aria-label={
                   view === "decade"
                     ? "Previous 100 years"
@@ -242,16 +354,17 @@ const DatePicker: React.FC<DatePickerProps> = ({
                     : "Previous year"
                 }
               >
-                <UilAngleDoubleLeft size="24" className="text-neutral-100" />
+                <UilAngleDoubleLeft size="24" />
               </button>
               {view === "day" && (
                 <button
                   type="button"
                   onClick={goToPrevMonth}
-                  className="p-1 rounded-full hover:bg-neutral-20"
+                  disabled={!canGoPrevMonth}
+                  className={getNavButtonClasses(!canGoPrevMonth)}
                   aria-label="Previous month"
                 >
-                  <UilAngleLeft size="24" className="text-neutral-100" />
+                  <UilAngleLeft size="24" />
                 </button>
               )}
             </div>
@@ -302,8 +415,8 @@ const DatePicker: React.FC<DatePickerProps> = ({
                   type="button"
                   onClick={() => setView("decade")}
                   className="justify-start text-neutral-90 text-lg font-bold hover:text-primary-main focus:outline-none focus:ring-1 focus:ring-primary-focus rounded px-1"
-                  aria-label={`Current decade ${currentDecadeStartForYearOption}-${currentDecadeEndForYearOption}, select decade range`}
-                >{`${currentDecadeStartForYearOption} - ${currentDecadeEndForYearOption}`}</button>
+                  aria-label={`Current decade ${currentViewDecadeStart}-${currentViewDecadeEnd}, select decade range`}
+                >{`${currentViewDecadeStart} - ${currentViewDecadeEnd}`}</button>
               )}
               {view === "decade" && (
                 <div className="justify-start text-neutral-90 text-lg font-bold">{`${decadeViewHeaderStart} - ${decadeViewHeaderEnd}`}</div>
@@ -316,10 +429,11 @@ const DatePicker: React.FC<DatePickerProps> = ({
                 <button
                   type="button"
                   onClick={goToNextMonth}
-                  className="p-1 rounded-full hover:bg-neutral-20"
+                  disabled={!canGoNextMonth}
+                  className={getNavButtonClasses(!canGoNextMonth)}
                   aria-label="Next month"
                 >
-                  <UilAngleRight size="24" className="text-neutral-100" />
+                  <UilAngleRight size="24" />
                 </button>
               )}
               <button
@@ -329,9 +443,18 @@ const DatePicker: React.FC<DatePickerProps> = ({
                     ? goToNextDecadeBlock
                     : view === "year"
                     ? goToNextDecade
-                    : goToNextYear
+                    : goToNextYear // Day and Month views use NextYear
                 }
-                className="p-1 rounded-full hover:bg-neutral-20"
+                disabled={
+                  (view === "decade" && !canGoNextDecadeBlock) ||
+                  (view === "year" && !canGoNextDecade) ||
+                  ((view === "day" || view === "month") && !canGoNextYear)
+                }
+                className={getNavButtonClasses(
+                  (view === "decade" && !canGoNextDecadeBlock) ||
+                    (view === "year" && !canGoNextDecade) ||
+                    ((view === "day" || view === "month") && !canGoNextYear)
+                )}
                 aria-label={
                   view === "decade"
                     ? "Next 100 years"
@@ -340,7 +463,7 @@ const DatePicker: React.FC<DatePickerProps> = ({
                     : "Next year"
                 }
               >
-                <UilAngleDoubleRight size="24" className="text-neutral-100" />
+                <UilAngleDoubleRight size="24" />
               </button>
             </div>
           </div>
@@ -371,10 +494,18 @@ const DatePicker: React.FC<DatePickerProps> = ({
                         selectedDate && isSameDay(day, selectedDate);
                       const isCurrentMonth = isSameMonth(day, currentDate);
                       const isCurrentDay = isToday(day);
+                      // Check if the day is outside the allowed range
+                      const dayStart = startOfDay(day);
+                      const isDisabledDay =
+                        !isCurrentMonth ||
+                        (minDate && isBefore(dayStart, minDate)) ||
+                        (maxDate && isAfter(dayStart, maxDate));
+
                       let dayTextClasses = "text-base font-normal leading-6";
                       let dayButtonClasses =
                         "w-10 h-10 p-2 flex justify-center items-center gap-2 rounded-full transition-colors focus:outline-none focus:ring-1 focus:ring-primary-focus";
-                      if (!isCurrentMonth) {
+
+                      if (isDisabledDay) {
                         dayTextClasses += " text-neutral-60";
                         dayButtonClasses +=
                           " bg-neutral-10 hover:bg-neutral-10 cursor-default";
@@ -397,8 +528,12 @@ const DatePicker: React.FC<DatePickerProps> = ({
                           key={dayIndex}
                           className={dayButtonClasses}
                           onClick={() => handleDayClick(day)}
-                          disabled={!isCurrentMonth}
-                          aria-label={`Select ${format(day, "PPP")}`}
+                          disabled={isDisabledDay || false} // Disable if off-month or outside range
+                          aria-label={
+                            isDisabledDay
+                              ? `Date ${format(day, "PPP")} (not selectable)`
+                              : `Select ${format(day, "PPP")}`
+                          }
                           aria-pressed={isSelected || false}
                         >
                           <div className={dayTextClasses}>
@@ -418,8 +553,21 @@ const DatePicker: React.FC<DatePickerProps> = ({
                 {monthsOfYear.map((monthName, monthIndex) => {
                   const isCurrentSelectedMonth =
                     getMonth(currentDate) === monthIndex;
+                  // Check if this month is outside the allowed range for the current year
+                  const targetMonthStart = startOfMonth(
+                    setMonth(currentDate, monthIndex)
+                  );
+                  const targetMonthEnd = endOfMonth(targetMonthStart);
+                  const isDisabledMonth =
+                    (minDate && isBefore(targetMonthEnd, minDate)) ||
+                    (maxDate && isAfter(targetMonthStart, maxDate));
+
                   let monthButtonClasses = `flex-1 h-10 p-2 rounded-lg flex justify-center items-center gap-2 transition-colors focus:outline-none focus:ring-1 focus:ring-primary-focus`;
-                  if (isCurrentSelectedMonth) {
+
+                  if (isDisabledMonth) {
+                    monthButtonClasses +=
+                      " bg-neutral-10 text-neutral-60 hover:bg-neutral-10 cursor-default";
+                  } else if (isCurrentSelectedMonth) {
                     monthButtonClasses +=
                       " bg-primary-surface text-primary-main font-bold outline outline-1 outline-primary-border";
                   } else {
@@ -432,7 +580,14 @@ const DatePicker: React.FC<DatePickerProps> = ({
                       type="button"
                       className={monthButtonClasses}
                       onClick={() => handleMonthClick(monthIndex)}
-                      aria-label={`Select ${monthName} ${getYear(currentDate)}`}
+                      disabled={isDisabledMonth || false}
+                      aria-label={
+                        isDisabledMonth
+                          ? `${monthName} ${getYear(
+                              currentDate
+                            )} (not selectable)`
+                          : `Select ${monthName} ${getYear(currentDate)}`
+                      }
                     >
                       <div className="text-center text-base">{monthName}</div>
                     </button>
@@ -448,43 +603,36 @@ const DatePicker: React.FC<DatePickerProps> = ({
                   const year = getYear(yearDate);
                   const isCurrentSelectedYear = getYear(currentDate) === year;
                   const isCurrentDecadeYear =
-                    year >= currentDecadeStartForYearOption &&
-                    year <= currentDecadeEndForYearOption;
-                  const isSelectableYear = year >= 2000 && year <= 2029; // Allowed range
+                    year >= currentViewDecadeStart &&
+                    year <= currentViewDecadeEnd;
+                  const isSelectableYear =
+                    (!minDate || year >= getYear(minDate)) &&
+                    (!maxDate || year <= getYear(maxDate));
+                  let isDisabled = !isCurrentDecadeYear || !isSelectableYear; // Disable if outside decade view OR outside min/max range
 
                   let yearButtonClasses = `flex-1 h-10 p-2 rounded-lg flex justify-center items-center gap-2 transition-colors focus:outline-none focus:ring-1 focus:ring-primary-focus`;
                   let yearTextClasses = "text-center text-base";
-                  let isDisabled = !isSelectableYear; // Disable if outside allowed range 2000-2029
-                  
-                  // Apply styles based on whether it's inside/outside the current decade VIEW first
-                  if (year > currentDecadeEnd) {
-                    // Disabled style (after 2029)
-                    yearTextClasses += " text-neutral-50";
-                    yearButtonClasses +=
-                      " bg-neutral-20 hover:bg-neutral-20 cursor-default";
-                    isDisabled = true;
+
+                  // Style based on view and selectability
+                  if (!isSelectableYear) {
+                    if (maxDate && year > getYear(maxDate)) {
+                      yearTextClasses += " text-neutral-50";
+                      yearButtonClasses +=
+                        " bg-neutral-20 hover:bg-neutral-20 cursor-default";
+                    } else {
+                      yearTextClasses += " text-neutral-60";
+                      yearButtonClasses +=
+                        " bg-neutral-10 hover:bg-neutral-10 cursor-default";
+                    }
                   } else if (!isCurrentDecadeYear) {
-                    // Style for years outside the current decade being viewed (but potentially selectable)
-                    yearTextClasses += isSelectableYear
-                      ? " text-neutral-90"
-                      : " text-neutral-60"; // Dim if outside selectable range too
-                    yearButtonClasses += " bg-neutral-10 hover:bg-neutral-10";
-                    yearButtonClasses += isSelectableYear
-                      ? " hover:bg-neutral-20"
-                      : " ";
-                  } else if (year < currentDecadeStart - 20) {
-                    // Off style (before 2000) - Should be caught by !isCurrentDecadeYear mostly, but good fallback
-                    yearTextClasses += " text-neutral-60";
+                    yearTextClasses += " text-neutral-60"; // Style for outside decade view
                     yearButtonClasses +=
                       " bg-neutral-10 hover:bg-neutral-10 cursor-default";
-                    isDisabled = true;
                   } else if (isCurrentSelectedYear) {
-                    // Selected Year style (within 2000-2029 and current view)
                     yearTextClasses += " text-primary-main font-bold";
                     yearButtonClasses +=
-                      " bg-primary-surface outline outline-1 outline-primary-border hover:bg-primary-surface"; // Keep bg on hover
+                      " bg-primary-surface outline outline-1 outline-primary-border hover:bg-primary-surface";
                   } else {
-                    // Default selectable year style (within 2000-2029 and current view)
                     yearTextClasses += " text-neutral-90";
                     yearButtonClasses += " bg-neutral-10 hover:bg-neutral-20";
                   }
@@ -515,46 +663,38 @@ const DatePicker: React.FC<DatePickerProps> = ({
               <div className="grid grid-cols-3 gap-2 w-full">
                 {calendarDecades.flat().map((decade) => {
                   const isCurrentDecadeRange =
-                    currentDecadeStart >= decade.start &&
-                    currentDecadeEnd <= decade.end;
+                    currentViewDecadeStart >= decade.start && // Use the decade start based on currentDate
+                    currentViewDecadeEnd <= decade.end;
+                  // Decade is considered selectable if it overlaps with the min/max year range
                   const isSelectableDecade =
-                    decade.end >= 1999 && decade.start <= 2029; // Does this decade contain any selectable years?
-                  console.log(currentDecadeStart, currentDecadeEnd);
+                    (!minDate || decade.end >= getYear(minDate)) &&
+                    (!maxDate || decade.start <= getYear(maxDate));
 
                   let decadeButtonClasses = `
                         flex-1 h-10 p-2 rounded-lg flex justify-center items-center gap-2
                         transition-colors focus:outline-none focus:ring-1 focus:ring-primary-focus text-center text-base
                     `;
-                  let isDisabled = !isSelectableDecade; // Disable if the decade contains no selectable years (2000-2029)
+                  let isDisabled = !isSelectableDecade;
 
-                  // Apply relative styling based on current decade
-                  if (decade.end < currentDecadeStart - 20) {
-                    // Ends before the previous decade starts (more than 2 decades ago)
-                    decadeButtonClasses +=
-                      " bg-neutral-10 text-neutral-60 hover:bg-neutral-10 cursor-default"; // Off style
-                    isDisabled = true;
-                  } else if (decade.start > currentDecadeEnd) {
-                    // Starts after the current decade ends
-                    decadeButtonClasses +=
-                      " bg-neutral-20 text-neutral-50 hover:bg-neutral-20 cursor-default"; // Disabled style
-                    isDisabled = true;
-                  } else if (isCurrentDecadeRange) {
-                    // Selected Decade style
+                  // Style based on selection and selectability (no relative "Off" or "Disabled" logic)
+                  if (isCurrentDecadeRange && isSelectableDecade) {
+                    // Selected Decade style (overlaps with selectable range)
                     decadeButtonClasses +=
                       " bg-primary-surface text-primary-main font-bold outline outline-1 outline-primary-border hover:bg-primary-surface";
-                  } else {
-                    // Default Selectable Decade style
+                  } else if (isSelectableDecade) {
+                    // Default Selectable Decade style (overlaps with selectable range)
                     decadeButtonClasses +=
                       " bg-neutral-10 text-neutral-90 hover:bg-neutral-20";
-                  }
-
-                  // Final check - ensure it's truly selectable overall
-                  if (!isSelectableDecade && !isDisabled) {
-                    // Apply disabled style if somehow missed above but contains no selectable years
-                    decadeButtonClasses = decadeButtonClasses.replace(
-                      " text-neutral-90 hover:bg-neutral-20",
-                      " bg-neutral-20 text-neutral-50 hover:bg-neutral-20 cursor-default"
-                    );
+                  } else {
+                    // Style for decades completely outside the min/max selectable range
+                    if (maxDate && decade.start > getYear(maxDate)) {
+                      decadeButtonClasses +=
+                        " bg-neutral-20 text-neutral-50 hover:bg-neutral-20 cursor-default"; // Disabled style
+                    } else {
+                      // minDate && decade.end < getYear(minDate)
+                      decadeButtonClasses +=
+                        " bg-neutral-10 text-neutral-60 hover:bg-neutral-10 cursor-default"; // Off style
+                    }
                     isDisabled = true;
                   }
 
