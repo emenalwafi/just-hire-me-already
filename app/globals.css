@@ -1,11 +1,37 @@
 @import "tailwindcss";
 
+/* ======================================================================== */
+/* ROOT VARIABLES (Light Mode Default)                                    */
+/* ======================================================================== */
+/* */
+/* These are standard CSS variables used to style the `body` tag directly.  */
+/* They are NOT part of the Tailwind theme system by default.               */
+/* */
+/* ======================================================================== */
 :root {
   --background: #ffffff;
   --foreground: #171717;
 }
 
+/* ======================================================================== */
+/* TAILWIND THEME DEFINITIONS                                             */
+/* ======================================================================== */
+/* */
+/* All variables here are automatically converted to utility classes.     */
+/* */
+/* Color Example:                                                         */
+/* --color-primary-main -> bg-primary-main, text-primary-main,            */
+/* border-primary-main, etc.                    */
+/* */
+/* Typography Example:                                                    */
+/* --text-lg -> text-lg                                                   */
+/* (Tailwind automatically pairs it with --text-lg--line-height)        */
+/* */
+/* ======================================================================== */
 @theme {
+  /* --- Neutral Color Palette --- */
+  /* Provides a range of grays for UI elements, backgrounds, and text. */
+  /* Usage: bg-neutral-20, text-neutral-90, border-neutral-40 */
   --color-neutral-10: #FFFFFF;
   --color-neutral-20: #FAFAFA;
   --color-neutral-30: #EDEDED;
@@ -17,66 +43,116 @@
   --color-neutral-90: #404040;
   --color-neutral-100: #1D1F20;
 
+  /* --- Primary (Accent) Colors --- */
+  /* Used for primary actions, links, and branding. */
+  /* Usage: bg-primary-main, text-primary-main, border-primary-border */
+  /* hover:bg-primary-hover, focus:ring-primary-focus */
   --color-primary-main: #01959F;
   --color-primary-surface: #F3FBFC;
   --color-primary-border: #4DB5BC;
   --color-primary-hover: #01777F;
   --color-primary-pressed: #01595F;
-  --color-primary-focus: #01959F;
+  --color-primary-focus: #01959F20;
+  /* 20% opacity for focus ring */
 
+  /* --- Secondary (Accent) Colors --- */
+  /* Used for secondary actions and highlights. */
+  /* Usage: bg-secondary-main, hover:bg-secondary-hover */
   --color-secondary-main: #FBC037;
   --color-secondary-surface: #FFFCF5;
   --color-secondary-border: #FEEABC;
   --color-secondary-hover: #F8A92F;
   --color-secondary-pressed: #FA9810;
-  --color-secondary-focus: #FBC037;
+  --color-secondary-focus: #FBC03720;
 
+  /* --- Danger Colors --- */
+  /* Used for destructive actions, errors, and alerts. */
+  /* Usage: bg-danger-main, text-danger-main, bg-danger-surface */
   --color-danger-main: #E01428;
   --color-danger-surface: #FFF9FA;
   --color-danger-border: #F5B1B7;
   --color-danger-hover: #BC1121;
   --color-danger-pressed: #700A14;
-  --color-danger-focus: #E01428;
+  --color-danger-focus: #E0142820;
 
+  /* --- Warning Colors --- */
+  /* Used for non-critical warnings and notifications. */
+  /* Usage: bg-warning-main, text-warning-main, border-warning-border */
   --color-warning-main: #CA7336;
   --color-warning-surface: #FCF7F3;
   --color-warning-border: #FEB17B;
   --color-warning-hover: #B1652F;
   --color-warning-pressed: #985628;
-  --color-warning-focus: #CA7336;
+  --color-warning-focus: #CA733620;
 
+  /* --- Success Colors --- */
+  /* Used for positive feedback, success messages, and confirmations. */
+  /* Usage: bg-success-main, text-success-main, bg-success-surface */
   --color-success-main: #43936C;
   --color-success-surface: #F7F7F7;
   --color-success-border: #B8DBCA;
   --color-success-hover: #367A59;
   --color-success-pressed: #20573D;
-  --color-success-focus: #731912;
+  --color-success-focus: #73191220;
 
+  /* ======================================================================== */
+  /* TYPOGRAPHY & FONT SIZES                                                */
+  /* ======================================================================== */
+  /* */
+  /* Defines the typographic scale.                                         */
+  /* Usage: text-xs, text-base, text-heading-lg, etc.                     */
+  /* */
+  /* ======================================================================== */
+
+  /* Extra Small */
+  /* Usage: text-xs */
   --text-xs: 10px;
   --text-xs--line-height: 16px;
 
+  /* Small */
+  /* Usage: text-sm */
   --text-sm: 12px;
   --text-sm--line-height: 20px;
 
+  /* Base (Body) */
+  /* Usage: text-base */
   --text-base: 14px;
   --text-base--line-height: 24px;
 
+  /* Large */
+  /* Usage: text-lg */
   --text-lg: 16px;
   --text-lg--line-height: 28px;
 
+  /* Small Heading */
+  /* Usage: text-heading-sm */
   --text-heading-sm: 20px;
   --text-heading-sm--line-height: 32px;
 
+  /* Base Heading */
+  /* Usage: text-heading-base */
   --text-heading-base: 24px;
   --text-heading-base--line-height: 36px;
 
+  /* Large Heading */
+  /* Usage: text-heading-lg */
   --text-heading-lg: 32px;
   --text-heading-lg--line-height: 44px;
 
+  /* Display */
+  /* Usage: text-display */
   --text-display: 48px;
   --text-display--line-height: 64px;
 }
 
+/* ======================================================================== */
+/* DARK MODE OVERRIDES                                                    */
+/* ======================================================================== */
+/* */
+/* Overrides the :root variables for dark color scheme.                   */
+/* These are used by the `body` style below.                              */
+/* */
+/* ======================================================================== */
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
@@ -84,6 +160,13 @@
   }
 }
 
+/* ======================================================================== */
+/* BASE BODY STYLES                                                       */
+/* ======================================================================== */
+/* */
+/* Applies the root background/foreground colors and sets a default font. */
+/* */
+/* ======================================================================== */
 body {
   background: var(--background);
   color: var(--foreground);
