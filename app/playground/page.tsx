@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react"; // Removed useRef as it's handled within PhoneNumberInput
+import { useMemo, useState } from "react";
 import Chip from "@/components/chip/Chip";
 import DatePicker from "@/components/date-picker/DatePicker";
-// Import the PhoneNumberInput component
 import PhoneNumberInput from "@/components/phone-number-input/PhoneNumberInput";
 import {
   Country,
@@ -11,6 +10,7 @@ import {
 } from "@/hooks/country-phone-popover/useCountryPhonePopover";
 import DropdownInput from "@/components/dropdown-input/DropdownInput";
 import { DropdownOption } from "@/hooks/dropdown-popover/useDropdownPopover";
+import TextInput from "@/components/text-input/TextInput";
 
 // Sample options for Dropdown examples
 const domicileOptions: DropdownOption[] = [
@@ -33,7 +33,10 @@ const domicileOptions: DropdownOption[] = [
 
 // --- Helper function to extract national number ---
 // Moved logic here to avoid repetition and remove manual useMemo
-function getNationalNumber(phoneNumber: string | null, iso: string | null): string {
+function getNationalNumber(
+  phoneNumber: string | null,
+  iso: string | null
+): string {
   if (!phoneNumber) return "";
   const countries = getAllCountryData();
   const country = countries.find((c) => c.iso === iso?.toUpperCase());
@@ -76,6 +79,14 @@ export default function Home() {
     useState<DropdownOption | null>(null);
   const [selectedDomicile2, setSelectedDomicile2] =
     useState<DropdownOption | null>(domicileOptions[1]);
+
+  // --- State for TextInput examples ---
+  const [textValue1, setTextValue1] = useState<string | null>(null);
+  const [textValue2, setTextValue2] = useState<string | null>("Initial Value");
+  const [textValue3, setTextValue3] = useState<string | null>(null); // For error example
+  const [textValue4, setTextValue4] = useState<string | null>("Disabled Value");
+  const [emailValue, setEmailValue] = useState<string | null>(""); // For email/success example
+  const [passwordValue, setPasswordValue] = useState<string | null>(""); // For email/success example
 
   // --- Helper logic to display national number (repeated for each example) ---
   // We call the helper function directly. The React Compiler will memoize
@@ -127,6 +138,13 @@ export default function Home() {
       setPhoneNumberControlled(country?.code || null);
     }
   };
+
+  // --- Example Validation for Email/URL ---
+  const isValidEmail = useMemo(() => {
+    if (!emailValue) return false;
+    // Simple regex for demonstration
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue);
+  }, [emailValue]);
 
   // Removed all the repetitive useMemo blocks for nationalNumber 1-5
   // They are now simple const declarations above, using the helper function.
@@ -195,7 +213,11 @@ export default function Home() {
             <label className="block text-sm font-medium text-neutral-70 mb-1">
               With Initial Value:
             </label>
-            <DatePicker value={selectedDate2} onChange={setSelectedDate2} error={'This field is Not Valid'} />
+            <DatePicker
+              value={selectedDate2}
+              onChange={setSelectedDate2}
+              error={"This field is Not Valid"}
+            />
             <p className="text-xs text-neutral-60 mt-1">
               Selected: {selectedDate2 || "None"}
             </p>
@@ -369,7 +391,6 @@ export default function Home() {
               options={domicileOptions}
               value={selectedDomicile1}
               onChange={setSelectedDomicile1}
-              popoverWidth="w-popover"
             />
             <p className="text-xs text-neutral-60 mt-1">
               Selected ID: {selectedDomicile1?.id || "None"}
@@ -385,7 +406,6 @@ export default function Home() {
               options={domicileOptions}
               value={selectedDomicile2}
               onChange={setSelectedDomicile2}
-              popoverWidth="w-popover"
               error="This field is required" // Example error message
             />
             <p className="text-xs text-neutral-60 mt-1">
@@ -416,7 +436,6 @@ export default function Home() {
               options={domicileOptions}
               value={selectedDomicile1} // Reusing state for example
               onChange={setSelectedDomicile1}
-              popoverWidth="w-full" // Use w-full to match trigger
             />
             <p className="text-xs text-neutral-60 mt-1">
               Selected ID: {selectedDomicile1?.id || "None"}
@@ -431,11 +450,110 @@ export default function Home() {
               options={domicileOptions}
               value={selectedDomicile1} // Reusing state for example
               onChange={setSelectedDomicile1}
-              popoverWidth="w-popover" // Use specific width
             />
             <p className="text-xs text-neutral-60 mt-1">
               Selected ID: {selectedDomicile1?.id || "None"}
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* --- Text Input Section --- */}
+      <section>
+        <h2 className="text-xl font-bold mb-4">Text Input</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-12 items-start">
+          {/* Example 1: Basic */}
+          <div className="w-72">
+            <TextInput
+              label="Full Name"
+              required
+              placeholder="Enter your full name"
+              value={textValue1}
+              onChange={(e) => setTextValue1(e.target.value)}
+              name="fullName"
+              maxLength={50} // Example standard prop
+            />
+            <p className="text-xs text-neutral-60 mt-1">
+              Value: {textValue1 || "Empty"}
+            </p>
+          </div>
+
+          {/* Example 2: With Initial Value */}
+          <div className="w-72">
+            <TextInput
+              label="Username"
+              placeholder="Enter username"
+              value={textValue2}
+              onChange={(e) => setTextValue2(e.target.value)}
+            />
+            <p className="text-xs text-neutral-60 mt-1">
+              Value: {textValue2 || "Empty"}
+            </p>
+          </div>
+
+          {/* Example 3: Error State */}
+          <div className="w-72">
+            <TextInput
+              label="Required Field"
+              required
+              placeholder="Cannot be empty"
+              value={textValue3}
+              onChange={(e) => setTextValue3(e.target.value)}
+              // Example: Show error if field is required but empty after initial interaction
+              error={!textValue3 ? "This field is required" : false}
+            />
+            <p className="text-xs text-neutral-60 mt-1">
+              Value: {textValue3 || "Empty"}
+            </p>
+          </div>
+
+          {/* Example 4: Disabled State */}
+          <div className="w-72">
+            <TextInput
+              label="Read Only Field"
+              value={textValue4}
+              onChange={(e) => setTextValue4(e.target.value)}
+              disabled={true}
+            />
+            <p className="text-xs text-neutral-60 mt-1">
+              Value: {textValue4} (Disabled)
+            </p>
+          </div>
+
+          {/* Example 5: Email with Success Message */}
+          <div className="w-72">
+            <TextInput
+              label="Email Address"
+              required
+              type="email"
+              placeholder="Enter your email"
+              value={emailValue}
+              onChange={(e) => setEmailValue(e.target.value)}
+              // Show success message only if valid and not empty
+              successMessage={
+                isValidEmail ? "Email format looks good!" : undefined
+              }
+              // Show error if not empty AND not valid
+              error={
+                emailValue && !isValidEmail ? "Invalid email format" : false
+              }
+            />
+            <p className="text-xs text-neutral-60 mt-1">
+              Value: {emailValue || "Empty"}
+            </p>
+          </div>
+
+          {/* Example 6: Password */}
+          <div className="w-72">
+            <TextInput
+              label="Password"
+              required
+              type="password"
+              placeholder="Enter password"
+              value={passwordValue} // Typically password inputs aren't controlled directly with display value
+              onChange={(e) => setPasswordValue(e.target.value)} // Handle change appropriately
+            />
+            <p className="text-xs text-neutral-60 mt-1">Value: ******</p>
           </div>
         </div>
       </section>

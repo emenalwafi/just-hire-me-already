@@ -139,7 +139,7 @@ const DropdownInput: React.FC<DropdownInputProps> = ({
 
   return (
     <div
-      className={`self-stretch inline-flex flex-col justify-start items-start gap-1 font-sans`}
+      className={`w-full self-stretch inline-flex flex-col justify-start items-start gap-1 font-sans`}
     >
       {label && (
         <div className="self-stretch justify-start">

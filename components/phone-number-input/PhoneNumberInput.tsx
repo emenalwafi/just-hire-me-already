@@ -97,16 +97,10 @@ const PhoneNumberInput: React.FC<PhoneNumberInputProps> = ({
   const [isFocused, setIsFocused] = useState(false);
   const countries = useMemo(() => getAllCountryData(), []);
 
-  // --- Refactor Start ---
-  // Instead of using useEffect to sync props to state, we derive the
-  // displayed values directly from props using useMemo.
-  // This fixes the "set-state-in-effect" error.
   const { selectedCountry, nationalNumberToDisplay } = useMemo(() => {
     let determinedCountry: Country | null = null;
     let determinedNationalNum = "";
 
-    // 1. Determine the country
-    // Priority: Prop -> Parsed Value -> Default
     if (selectedCountryIsoProp) {
       determinedCountry =
         countries.find((c) => c.iso === selectedCountryIsoProp.toUpperCase()) ||
@@ -128,7 +122,6 @@ const PhoneNumberInput: React.FC<PhoneNumberInputProps> = ({
         null;
     }
 
-    // 2. Determine the national number to display
     if (
       value &&
       determinedCountry &&
@@ -143,16 +136,10 @@ const PhoneNumberInput: React.FC<PhoneNumberInputProps> = ({
       ) {
         determinedNationalNum = phoneNumberInstance.nationalNumber;
       }
-      // If value exists but doesn't match country, we show nothing
-      // else: determinedNationalNum = "";
     }
-    // else: determinedNationalNum = "";
-
-    // 3. Format the national number for display
     const formatter = new AsYouType(
       determinedCountry?.iso as CountryCode | undefined
     );
-    // Input the raw digits to get the formatted version
     formatter.input(determinedNationalNum);
     const formattedDisplayNumber =
       formatter.getNumber()?.nationalNumber ?? determinedNationalNum;
@@ -162,7 +149,6 @@ const PhoneNumberInput: React.FC<PhoneNumberInputProps> = ({
       nationalNumberToDisplay: formattedDisplayNumber,
     };
   }, [value, selectedCountryIsoProp, defaultCountryIso, countries]);
-  // --- Refactor End ---
 
   const {
     isOpen: isCountryPopoverOpen,
@@ -171,17 +157,14 @@ const PhoneNumberInput: React.FC<PhoneNumberInputProps> = ({
   } = useCountryPhonePopover({
     anchorRef: triggerRef,
     onSelectCountry: (country) => {
-      // Don't set internal state. Just call the prop callbacks.
       onCountryChange?.(country);
 
-      // Get current digits from the *derived* display value
       const currentDigits = nationalNumberToDisplay.replace(/\D/g, "");
       onChange(
         currentDigits ? `${country.code}${currentDigits}` : country.code
       );
       inputRef.current?.focus();
     },
-    // Use the derived selectedCountry's ISO
     selectedCountryIso: selectedCountry?.iso,
     disabledCountryIsos: disabledCountryIsos,
   });
@@ -190,8 +173,6 @@ const PhoneNumberInput: React.FC<PhoneNumberInputProps> = ({
     const rawValue = e.target.value;
     const currentDigits = rawValue.replace(/\D/g, "");
 
-    // We don't call setNationalNumber anymore.
-    // We just report the new full value up to the parent.
     const fullNumber =
       selectedCountry && currentDigits
         ? `${selectedCountry.code}${currentDigits}`
@@ -199,10 +180,6 @@ const PhoneNumberInput: React.FC<PhoneNumberInputProps> = ({
         ? selectedCountry.code
         : null;
     onChange(fullNumber);
-
-    // The component will re-render with the new `value` prop,
-    // and our `useMemo` will calculate the correctly formatted
-    // `nationalNumberToDisplay` all in a single render pass.
   };
 
   let wrapperClasses =
@@ -226,7 +203,7 @@ const PhoneNumberInput: React.FC<PhoneNumberInputProps> = ({
   }
 
   return (
-    <div className="w-96 inline-flex flex-col justify-start items-start gap-1">
+    <div className="w-full inline-flex flex-col justify-start items-start gap-1">
       {label && (
         <div className="self-stretch justify-start">
           <span className="text-neutral-90 text-sm">{label}</span>

@@ -239,7 +239,7 @@ describe("DropdownInput", () => {
           options={mockOptions}
         />
       );
-      const { input, wrapper, caretButton } = getElements();
+      const { input, wrapper } = getElements();
 
       // Default state
       expect(wrapper).toHaveClass("bg-neutral-10 outline-neutral-40");

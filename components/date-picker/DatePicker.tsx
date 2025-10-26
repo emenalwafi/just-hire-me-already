@@ -134,7 +134,7 @@ const DatePicker: React.FC<DatePickerProps> = ({
     });
 
   let triggerWrapperClasses =
-    "cursor-pointer self-stretch h-10 px-4 py-2 rounded-lg outline outline-2 outline-offset-[-2px] inline-flex justify-between items-center gap-2 overflow-hidden transition-colors";
+    "w-full cursor-pointer self-stretch h-10 px-4 py-2 rounded-lg outline outline-2 outline-offset-[-2px] inline-flex justify-between items-center gap-2 overflow-hidden transition-colors";
   let triggerTextClasses = "flex-1 justify-start text-base text-left";
   let iconColorClass = "";
 
@@ -160,7 +160,7 @@ const DatePicker: React.FC<DatePickerProps> = ({
 
   return (
     <div
-      className="relative inline-block w-full max-w-xs font-sans"
+      className="relative inline-block w-full font-sans"
       ref={containerRef}
     >
       {/* 1. Label and Trigger Input */}
