@@ -9,6 +9,27 @@ import {
   Country,
   getAllCountryData,
 } from "@/hooks/country-phone-popover/useCountryPhonePopover";
+import DropdownInput from "@/components/dropdown-input/DropdownInput";
+import { DropdownOption } from "@/hooks/dropdown-popover/useDropdownPopover";
+
+// Sample options for Dropdown examples
+const domicileOptions: DropdownOption[] = [
+  { id: "aceh_barat", label: "Kabupaten Aceh Barat - Aceh" },
+  { id: "aceh_besar", label: "Kabupaten Aceh Besar - Aceh" },
+  { id: "aceh_selatan", label: "Kabupaten Aceh Selatan - Aceh" },
+  { id: "aceh_tamiang", label: "Kabupaten Aceh Tamiang - Aceh" },
+  { id: "aceh_tengah", label: "Kabupaten Aceh Tengah - Aceh" },
+  { id: "aceh_tenggara", label: "Kabupaten Aceh Tenggara - Aceh" },
+  { id: "aceh_utara", label: "Kabupaten Aceh Utara - Aceh" },
+  { id: "banda_aceh", label: "Kota Banda Aceh - Aceh" },
+  // Add more options as needed for scrolling example
+  { id: "jawa_barat_1", label: "Kabupaten Bandung - Jawa Barat" },
+  { id: "jawa_barat_2", label: "Kota Bandung - Jawa Barat" },
+  { id: "jawa_barat_3", label: "Kabupaten Bogor - Jawa Barat" },
+  { id: "jawa_barat_4", label: "Kota Bogor - Jawa Barat" },
+  { id: "jakarta_1", label: "Jakarta Pusat - DKI Jakarta" },
+  { id: "jakarta_2", label: "Jakarta Selatan - DKI Jakarta" },
+];
 
 export default function Home() {
   const [selectedChip, setSelectedChip] = useState<string | null>("rest");
@@ -38,6 +59,11 @@ export default function Home() {
     string | null
   >(null);
   const [controlledIso, setControlledIso] = useState<string | null>("US"); // Start with US selected
+
+  const [selectedDomicile1, setSelectedDomicile1] =
+    useState<DropdownOption | null>(null);
+  const [selectedDomicile2, setSelectedDomicile2] =
+    useState<DropdownOption | null>(domicileOptions[1]);
 
   // --- Handlers for country change in each example ---
   const handleCountryChange1 = (country: Country | null) => {
@@ -194,7 +220,7 @@ export default function Home() {
             <label className="block text-sm font-medium text-neutral-70 mb-1">
               With Initial Value:
             </label>
-            <DatePicker value={selectedDate2} onChange={setSelectedDate2} />
+            <DatePicker value={selectedDate2} onChange={setSelectedDate2} error={'This field is Not Valid'} />
             <p className="text-xs text-neutral-60 mt-1">
               Selected: {selectedDate2 || "None"}
             </p>
@@ -349,6 +375,92 @@ export default function Home() {
                 Set Null (Fallback to Default)
               </button>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* --- Dropdown Input Section --- */}
+      <section>
+        <h2 className="text-xl font-bold mb-4">Dropdown Input</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-12 items-start">
+          {/* Example 1: Basic Dropdown */}
+          <div className="w-72">
+            {" "}
+            {/* Constrain width for example */}
+            <DropdownInput
+              label="Domicile (Basic)"
+              required
+              placeholder="Choose your domicile"
+              options={domicileOptions}
+              value={selectedDomicile1}
+              onChange={setSelectedDomicile1}
+              popoverWidth="w-popover"
+            />
+            <p className="text-xs text-neutral-60 mt-1">
+              Selected ID: {selectedDomicile1?.id || "None"}
+            </p>
+          </div>
+
+          {/* Example 2: Pre-selected & Error */}
+          <div className="w-72">
+            <DropdownInput
+              label="Domicile (Pre-selected & Error)"
+              required
+              placeholder="Choose your domicile"
+              options={domicileOptions}
+              value={selectedDomicile2}
+              onChange={setSelectedDomicile2}
+              popoverWidth="w-popover"
+              error="This field is required" // Example error message
+            />
+            <p className="text-xs text-neutral-60 mt-1">
+              Selected ID: {selectedDomicile2?.id || "None"}
+            </p>
+          </div>
+
+          {/* Example 3: Disabled */}
+          <div className="w-72">
+            <DropdownInput
+              label="Domicile (Disabled)"
+              placeholder="Cannot select domicile"
+              options={domicileOptions}
+              value={null} // Usually null when disabled, unless pre-filled
+              onChange={() => {}} // No-op
+              disabled={true}
+            />
+            <p className="text-xs text-neutral-60 mt-1">
+              Selected ID: None (Disabled)
+            </p>
+          </div>
+
+          {/* Example 4: Custom Popover Width (Example, matches trigger width) */}
+          <div className="w-72">
+            <DropdownInput
+              label="Domicile (Popover Matches Trigger)"
+              placeholder="Choose domicile"
+              options={domicileOptions}
+              value={selectedDomicile1} // Reusing state for example
+              onChange={setSelectedDomicile1}
+              popoverWidth="w-full" // Use w-full to match trigger
+            />
+            <p className="text-xs text-neutral-60 mt-1">
+              Selected ID: {selectedDomicile1?.id || "None"}
+            </p>
+          </div>
+
+          {/* Example 5: Fixed Popover Width */}
+          <div className="w-72">
+            <DropdownInput
+              label="Domicile (Fixed Popover Width)"
+              placeholder="Choose domicile"
+              options={domicileOptions}
+              value={selectedDomicile1} // Reusing state for example
+              onChange={setSelectedDomicile1}
+              popoverWidth="w-popover" // Use specific width
+            />
+            <p className="text-xs text-neutral-60 mt-1">
+              Selected ID: {selectedDomicile1?.id || "None"}
+            </p>
           </div>
         </div>
       </section>

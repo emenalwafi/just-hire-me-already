@@ -191,7 +191,7 @@ const DatePicker: React.FC<DatePickerProps> = ({
 
       {/* Helper Text for Error */}
       {typeof error === "string" && !disabled && (
-        <div className="self-stretch inline-flex justify-start items-start gap-1 mt-1">
+        <div className="self-stretch justify-start items-start gap-1 mt-1">
           <div className="flex-1 justify-start text-danger-main text-sm">
             {error}
           </div>
