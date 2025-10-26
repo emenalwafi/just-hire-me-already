@@ -23,7 +23,7 @@ let mockOnClose: () => void;
  * It also provides a mock `popoverElement` with the ID the component
  * uses for its blur-handling logic.
  */
-jest.mock("../../hooks/dropdown-popover/useDropdownPopover", () => ({
+jest.mock("../../../hooks/dropdown-popover/useDropdownPopover", () => ({
   useDropdownPopover: jest.fn(
     ({
       onSelectOption,
@@ -92,7 +92,7 @@ describe("DropdownInput", () => {
   beforeEach(() => {
     mockOnChange = jest.fn();
     (
-      jest.requireMock("../../hooks/dropdown-popover/useDropdownPopover")
+      jest.requireMock("../../../hooks/dropdown-popover/useDropdownPopover")
         .useDropdownPopover as jest.Mock
     ).mockImplementation(
       ({
@@ -366,7 +366,7 @@ describe("DropdownInput", () => {
 
       expect(input).toHaveFocus();
       expect(
-        jest.requireMock("../../hooks/dropdown-popover/useDropdownPopover")
+        jest.requireMock("../../../hooks/dropdown-popover/useDropdownPopover")
           .useDropdownPopover
       ).toHaveBeenLastCalledWith(
         expect.objectContaining({
@@ -397,7 +397,7 @@ describe("DropdownInput", () => {
 
       expect(input.value).toBe("Ap");
       expect(
-        jest.requireMock("../../hooks/dropdown-popover/useDropdownPopover")
+        jest.requireMock("../../../hooks/dropdown-popover/useDropdownPopover")
           .useDropdownPopover
       ).toHaveBeenLastCalledWith(
         expect.objectContaining({
@@ -425,7 +425,7 @@ describe("DropdownInput", () => {
       });
 
       expect(
-        jest.requireMock("../../hooks/dropdown-popover/useDropdownPopover")
+        jest.requireMock("../../../hooks/dropdown-popover/useDropdownPopover")
           .useDropdownPopover
       ).toHaveBeenLastCalledWith(
         expect.objectContaining({
@@ -449,7 +449,7 @@ describe("DropdownInput", () => {
       });
 
       expect(
-        jest.requireMock("../../hooks/dropdown-popover/useDropdownPopover")
+        jest.requireMock("../../../hooks/dropdown-popover/useDropdownPopover")
           .useDropdownPopover
       ).toHaveBeenLastCalledWith(
         expect.objectContaining({
@@ -488,7 +488,7 @@ describe("DropdownInput", () => {
       expect(mockOnChange).toHaveBeenCalledWith(mockOptions[1]);
 
       expect(
-        jest.requireMock("../../hooks/dropdown-popover/useDropdownPopover")
+        jest.requireMock("../../../hooks/dropdown-popover/useDropdownPopover")
           .useDropdownPopover
       ).toHaveBeenLastCalledWith(
         expect.objectContaining({

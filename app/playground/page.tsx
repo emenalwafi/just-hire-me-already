@@ -1,45 +1,301 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import Chip from "@/components/chip/Chip";
-import DatePicker from "@/components/date-picker/DatePicker";
-import PhoneNumberInput from "@/components/phone-number-input/PhoneNumberInput";
+import React, { useState, useMemo } from "react";
+import Chip from "@/components/input/chip/Chip";
+import Input from "@/components/input/Input";
+import {
+  InputConfig,
+  TextInputConfig,
+  RadioInputConfig,
+  DropdownInputConfig,
+  DatePickerConfig,
+  PhoneNumberInputConfig,
+  InputValue,
+  InputOnChange,
+  UnifiedChangeValue,
+  PhoneCountryChange,
+} from "@/types/InputConfig";
+import { DropdownOption } from "@/hooks/dropdown-popover/useDropdownPopover";
 import {
   Country,
   getAllCountryData,
 } from "@/hooks/country-phone-popover/useCountryPhonePopover";
-import DropdownInput from "@/components/dropdown-input/DropdownInput";
-import { DropdownOption } from "@/hooks/dropdown-popover/useDropdownPopover";
-import TextInput from "@/components/text-input/TextInput";
-import RadioInput from "@/components/radio-input/RadioInput";
 
-// Sample options for Dropdown examples
-const domicileOptions: DropdownOption[] = [
-  { id: "aceh_barat", label: "Kabupaten Aceh Barat - Aceh" },
-  { id: "aceh_besar", label: "Kabupaten Aceh Besar - Aceh" },
-  { id: "aceh_selatan", label: "Kabupaten Aceh Selatan - Aceh" },
-  { id: "aceh_tamiang", label: "Kabupaten Aceh Tamiang - Aceh" },
-  { id: "aceh_tengah", label: "Kabupaten Aceh Tengah - Aceh" },
-  { id: "aceh_tenggara", label: "Kabupaten Aceh Tenggara - Aceh" },
-  { id: "aceh_utara", label: "Kabupaten Aceh Utara - Aceh" },
-  { id: "banda_aceh", label: "Kota Banda Aceh - Aceh" },
-  // Add more options as needed for scrolling example
-  { id: "jawa_barat_1", label: "Kabupaten Bandung - Jawa Barat" },
-  { id: "jawa_barat_2", label: "Kota Bandung - Jawa Barat" },
-  { id: "jawa_barat_3", label: "Kabupaten Bogor - Jawa Barat" },
-  { id: "jawa_barat_4", label: "Kota Bogor - Jawa Barat" },
-  { id: "jakarta_1", label: "Jakarta Pusat - DKI Jakarta" },
-  { id: "jakarta_2", label: "Jakarta Selatan - DKI Jakarta" },
-];
-
+/**
+ * Sample data for RadioInput options (Pronouns).
+ * @type {Array<{value: string, label: string}>}
+ */
 const pronounOptions = [
   { value: "female", label: "She/her (Female)" },
   { value: "male", label: "He/him (Male)" },
   { value: "other", label: "They/them (Other)" },
 ];
 
-// --- Helper function to extract national number ---
-// Moved logic here to avoid repetition and remove manual useMemo
+/**
+ * Sample data for DropdownInput options (Domiciles).
+ * @type {DropdownOption[]}
+ */
+const domicileOptions: DropdownOption[] = [
+  { id: "aceh_barat", label: "Kabupaten Aceh Barat - Aceh" },
+  { id: "aceh_besar", label: "Kabupaten Aceh Besar - Aceh" },
+  { id: "aceh_selatan", label: "Kabupaten Aceh Selatan - Aceh" },
+  { id: "jakarta_1", label: "Jakarta Pusat - DKI Jakarta" },
+  { id: "jakarta_2", label: "Jakarta Selatan - DKI Jakarta" },
+  { id: "bandung_1", label: "Kota Bandung - Jawa Barat" },
+  { id: "bogor_1", label: "Kota Bogor - Jawa Barat" },
+];
+
+/** Base configuration for a 'text' input for Full Name. */
+const baseNameConfig: TextInputConfig = {
+  type: "text",
+  name: "name",
+  label: "Full Name",
+  placeholder: "Enter full name",
+  required: true,
+};
+/** Base configuration for an 'email' input. */
+const baseEmailConfig: TextInputConfig = {
+  type: "email",
+  name: "email",
+  label: "Email",
+  placeholder: "Enter email",
+  required: true,
+};
+/** Base configuration for a 'password' input. */
+const basePasswordConfig: TextInputConfig = {
+  type: "password",
+  name: "password",
+  label: "Password",
+  placeholder: "Enter password",
+  required: true,
+};
+/** Base configuration for a 'radio' input for Pronouns. */
+const basePronounConfig: RadioInputConfig = {
+  type: "radio",
+  name: "pronoun",
+  label: "Pronoun",
+  options: pronounOptions,
+  required: true,
+};
+/** Base configuration for a 'dropdown' input for Domicile. */
+const baseDomicileConfig: DropdownInputConfig = {
+  type: "dropdown",
+  name: "domicile",
+  label: "Domicile",
+  options: domicileOptions,
+  placeholder: "Select domicile",
+  required: true,
+};
+/** Base configuration for a 'date' input for Birth Date. */
+const baseDateConfig: DatePickerConfig = {
+  type: "date",
+  name: "birthDate",
+  label: "Birth Date",
+  placeholder: "Select date",
+  required: true,
+};
+/** Base configuration for a 'phone' input for Phone Number. */
+const basePhoneConfig: PhoneNumberInputConfig = {
+  type: "phone",
+  name: "phone",
+  label: "Phone Number",
+  placeholder: "81xxxxxxx",
+  required: true,
+  defaultCountryIso: "ID",
+};
+
+/**
+ * Defines the structure for configuring and displaying an input field example
+ * in the playground component.
+ */
+interface InputFieldStateExample {
+  /** Unique key for React mapping. */
+  id: string;
+  /** Title displayed above the input example. */
+  title: string;
+  /** The base configuration object for the input type. */
+  config: InputConfig;
+  /** The key within the main `formState` object that holds this input's value. */
+  stateKey: string;
+  /** Optional properties to override or add to the base `config` for this specific example. */
+  stateProps?: Partial<InputConfig> & { selectedCountryIso?: string | null };
+  /** The key within the `phoneIsoState` object for controlling the phone input's country ISO (if applicable). */
+  countryStateKey?: string;
+}
+
+/**
+ * An array containing definitions for all input field examples shown in the playground.
+ * Each object specifies the base configuration, the state key for its value,
+ * and any overrides needed to demonstrate different states (error, disabled, etc.).
+ * @type {InputFieldStateExample[]}
+ */
+const inputFields: InputFieldStateExample[] = [
+  // Text Inputs
+  {
+    id: "name-rest",
+    title: "Text (Rest)",
+    config: baseNameConfig,
+    stateKey: "nameRest",
+  },
+  {
+    id: "name-filled",
+    title: "Text (Filled)",
+    config: baseNameConfig,
+    stateKey: "nameFilled",
+  },
+  {
+    id: "name-error",
+    title: "Text (Error)",
+    config: baseNameConfig,
+    stateKey: "nameError",
+    stateProps: { error: "Name is required" },
+  },
+  {
+    id: "name-disabled",
+    title: "Text (Disabled)",
+    config: baseNameConfig,
+    stateKey: "nameDisabled",
+    stateProps: { disabled: true },
+  },
+  {
+    id: "email-success",
+    title: "Email (Success)",
+    config: baseEmailConfig,
+    stateKey: "emailSuccess",
+    stateProps: { successMessage: "Email looks good!" },
+  },
+  {
+    id: "password-basic",
+    title: "Password",
+    config: basePasswordConfig,
+    stateKey: "passwordBasic",
+  },
+  // Radio Inputs
+  {
+    id: "pronoun-rest",
+    title: "Radio (Rest)",
+    config: basePronounConfig,
+    stateKey: "pronounRest",
+  },
+  {
+    id: "pronoun-selected",
+    title: "Radio (Selected)",
+    config: basePronounConfig,
+    stateKey: "pronounSelected",
+  },
+  {
+    id: "pronoun-error",
+    title: "Radio (Error)",
+    config: basePronounConfig,
+    stateKey: "pronounError",
+    stateProps: { error: "Please select a pronoun" },
+  },
+  {
+    id: "pronoun-disabled",
+    title: "Radio (Disabled)",
+    config: basePronounConfig,
+    stateKey: "pronounDisabled",
+    stateProps: { disabled: true },
+  },
+  // Dropdown Inputs
+  {
+    id: "domicile-rest",
+    title: "Dropdown (Rest)",
+    config: baseDomicileConfig,
+    stateKey: "domicileRest",
+  },
+  {
+    id: "domicile-selected",
+    title: "Dropdown (Selected)",
+    config: baseDomicileConfig,
+    stateKey: "domicileSelected",
+  },
+  {
+    id: "domicile-error",
+    title: "Dropdown (Error)",
+    config: baseDomicileConfig,
+    stateKey: "domicileError",
+    stateProps: { error: "Domicile is required" },
+  },
+  {
+    id: "domicile-disabled",
+    title: "Dropdown (Disabled)",
+    config: baseDomicileConfig,
+    stateKey: "domicileDisabled",
+    stateProps: { disabled: true },
+  },
+  // Date Pickers
+  {
+    id: "date-rest",
+    title: "DatePicker (Rest)",
+    config: baseDateConfig,
+    stateKey: "dateRest",
+  },
+  {
+    id: "date-selected",
+    title: "DatePicker (Selected)",
+    config: baseDateConfig,
+    stateKey: "dateSelected",
+  },
+  {
+    id: "date-error",
+    title: "DatePicker (Error)",
+    config: baseDateConfig,
+    stateKey: "dateError",
+    stateProps: { error: "Invalid date" },
+  },
+  {
+    id: "date-ranged",
+    title: "DatePicker (Ranged)",
+    config: { ...baseDateConfig, minDate: "2023-01-01", maxDate: "2023-12-31" },
+    stateKey: "dateRanged",
+  },
+  {
+    id: "date-disabled",
+    title: "DatePicker (Disabled)",
+    config: baseDateConfig,
+    stateKey: "dateDisabled",
+    stateProps: { disabled: true },
+  },
+  // Phone Inputs
+  {
+    id: "phone-rest",
+    title: "Phone (Rest)",
+    config: basePhoneConfig,
+    stateKey: "phoneRest",
+    countryStateKey: "phoneIsoRest",
+  },
+  {
+    id: "phone-filled",
+    title: "Phone (Filled)",
+    config: basePhoneConfig,
+    stateKey: "phoneFilled",
+    countryStateKey: "phoneIsoFilled",
+  },
+  {
+    id: "phone-error",
+    title: "Phone (Error)",
+    config: basePhoneConfig,
+    stateKey: "phoneError",
+    stateProps: { error: "Invalid phone number" },
+    countryStateKey: "phoneIsoError",
+  },
+  {
+    id: "phone-disabled",
+    title: "Phone (Disabled)",
+    config: basePhoneConfig,
+    stateKey: "phoneDisabled",
+    stateProps: { disabled: true },
+    countryStateKey: "phoneIsoDisabled",
+  },
+];
+
+/**
+ * Extracts the national number part from a full phone number string based on the country code.
+ * @param {string | null} phoneNumber - The full phone number (e.g., "+6281...") or null.
+ * @param {string | null} iso - The ISO code of the country (e.g., "ID").
+ * @returns {string} The national number part, or the original string if country/code doesn't match, or empty string.
+ */
 function getNationalNumber(
   phoneNumber: string | null,
   iso: string | null
@@ -50,604 +306,240 @@ function getNationalNumber(
   if (country && phoneNumber.startsWith(country.code)) {
     return phoneNumber.substring(country.code.length);
   }
-  return phoneNumber;
+  return phoneNumber; // Return original if no match or no country found
 }
 
+/**
+ * The main playground component demonstrating various input components and their states.
+ * Uses a unified `Input` component driven by configuration objects.
+ * @returns {React.ReactElement} The rendered playground page.
+ */
 export default function Home() {
+  /**
+   * Central state object holding the values for all input examples.
+   * Keys correspond to `stateKey` in the `inputFields` array.
+   */
+  const [formState, setFormState] = useState<Record<string, InputValue>>({
+    nameRest: null,
+    nameFilled: "John Doe",
+    nameError: null,
+    nameDisabled: "Cannot Edit",
+    emailSuccess: "valid@email.com",
+    passwordBasic: null,
+    pronounRest: null,
+    pronounSelected: "male",
+    pronounError: null,
+    pronounDisabled: "female",
+    domicileRest: null,
+    domicileSelected: domicileOptions[1],
+    domicileError: null,
+    domicileDisabled: domicileOptions[0],
+    dateRest: null,
+    dateSelected: "2024-10-27",
+    dateError: null,
+    dateRanged: null,
+    dateDisabled: "2023-05-01",
+    phoneRest: null,
+    phoneFilled: "+442071234567",
+    phoneError: "+123",
+    phoneDisabled: "+62812000000",
+  });
+
+  /**
+   * Separate state object holding the explicitly controlled ISO country codes
+   * for the phone input examples. Keys correspond to `countryStateKey`.
+   */
+  const [phoneIsoState, setPhoneIsoState] = useState<
+    Record<string, string | null>
+  >({
+    phoneIsoRest: "ID",
+    phoneIsoFilled: null,
+    phoneIsoError: null,
+    phoneIsoDisabled: null,
+  });
+
+  /**
+   * Generic handler to update the central `formState`.
+   * @param {string} key - The state key corresponding to the input.
+   * @param {UnifiedChangeValue} value - The new value from the Input component.
+   */
+  const handleChange = (key: string, value: UnifiedChangeValue) => {
+    setFormState((prev) => ({ ...prev, [key]: value }));
+  };
+
+  /**
+   * Generic handler to update the `phoneIsoState` when a phone input's country changes.
+   * Also updates the main `formState` value if the national number part is empty.
+   * @param {string} key - The state key corresponding to the phone input's ISO code.
+   * @param {Country | null} country - The newly selected country object, or null.
+   */
+  const handlePhoneCountryChange = (key: string, country: Country | null) => {
+    setPhoneIsoState((prev) => ({ ...prev, [key]: country?.iso || null }));
+
+    const currentPhoneValue = formState[key] as string | null;
+    const nationalNum = getNationalNumber(
+      currentPhoneValue,
+      country?.iso || null
+    );
+    if (!nationalNum && country) {
+      setFormState((prev) => ({ ...prev, [key]: country.code }));
+    }
+  };
+
+  /** State for managing the selected Chip component example. */
   const [selectedChip, setSelectedChip] = useState<string | null>("rest");
-  const [selectedDate1, setSelectedDate1] = useState<string | null>(null);
-  const [selectedDate2, setSelectedDate2] = useState<string | null>(
-    "2024-05-15"
-  ); // Example initial date
-  const [selectedDate3, setSelectedDate3] = useState<string | null>(
-    "2022-08-20"
-  ); // Example with bounds
-
-  const [phoneNumber1, setPhoneNumber1] = useState<string | null>(null);
-  const [iso1, setIso1] = useState<string | null>("ID"); // Default ISO for example 1
-
-  const [phoneNumber2, setPhoneNumber2] = useState<string | null>("+44");
-  const [iso2, setIso2] = useState<string | null>(null); // ISO will be derived from value initially
-
-  const [phoneNumber3, setPhoneNumber3] = useState<string | null>("+124212345");
-  const [iso3, setIso3] = useState<string | null>(null); // ISO will be derived initially
-
-  const [phoneNumber4, setPhoneNumber4] = useState<string | null>(
-    "+628123456789"
-  );
-  const [iso4, setIso4] = useState<string | null>(null); // ISO will be derived initially
-
-  const [phoneNumberControlled, setPhoneNumberControlled] = useState<
-    string | null
-  >(null);
-  const [controlledIso, setControlledIso] = useState<string | null>("US"); // Start with US selected
-
-  const [selectedDomicile1, setSelectedDomicile1] =
-    useState<DropdownOption | null>(null);
-  const [selectedDomicile2, setSelectedDomicile2] =
-    useState<DropdownOption | null>(domicileOptions[1]);
-
-  // --- State for TextInput examples ---
-  const [textValue1, setTextValue1] = useState<string | null>(null);
-  const [textValue2, setTextValue2] = useState<string | null>("Initial Value");
-  const [textValue3, setTextValue3] = useState<string | null>(null); // For error example
-  const [textValue4, setTextValue4] = useState<string | null>("Disabled Value");
-  const [emailValue, setEmailValue] = useState<string | null>(""); // For email/success example
-  const [passwordValue, setPasswordValue] = useState<string | null>(""); // For email/success example
-
-  const [selectedPronoun, setSelectedPronoun] = useState<string | null>("male");
-  const [selectedOption, setSelectedOption] = useState<string | null>(
-    "option2"
-  );
-  const [errorRadioValue, setErrorRadioValue] = useState<string | null>(null);
-
-  // --- Helper logic to display national number (repeated for each example) ---
-  // We call the helper function directly. The React Compiler will memoize
-  // these values automatically.
-  const nationalNumber1 = getNationalNumber(phoneNumber1, iso1);
-  const nationalNumber2 = getNationalNumber(phoneNumber2, iso2);
-  const nationalNumber3 = getNationalNumber(phoneNumber3, iso3);
-  const nationalNumber4 = getNationalNumber(phoneNumber4, iso4);
-  const nationalNumberControlled = getNationalNumber(
-    phoneNumberControlled,
-    controlledIso
-  );
-
-  // --- Handlers for country change in each example ---
-  const handleCountryChange1 = (country: Country | null) => {
-    console.log("Country 1 Changed:", country);
-    setIso1(country?.iso || null);
-    // If number part is empty, update value to just the new code
-    // Note: We check the *derived* national number here
-    if (!getNationalNumber(phoneNumber1, country?.iso || null)) {
-      setPhoneNumber1(country?.code || null);
-    }
-  };
-  const handleCountryChange2 = (country: Country | null) => {
-    console.log("Country 2 Changed:", country);
-    setIso2(country?.iso || null);
-    if (!getNationalNumber(phoneNumber2, country?.iso || null)) {
-      setPhoneNumber2(country?.code || null);
-    }
-  };
-  const handleCountryChange3 = (country: Country | null) => {
-    console.log("Country 3 Changed:", country);
-    setIso3(country?.iso || null);
-    if (!getNationalNumber(phoneNumber3, country?.iso || null)) {
-      setPhoneNumber3(country?.code || null);
-    }
-  };
-  const handleCountryChange4 = (country: Country | null) => {
-    console.log("Country 4 Changed:", country);
-    setIso4(country?.iso || null);
-    if (!getNationalNumber(phoneNumber4, country?.iso || null)) {
-      setPhoneNumber4(country?.code || null);
-    }
-  };
-  const handleCountryChangeControlled = (country: Country | null) => {
-    console.log("Country Controlled Changed:", country);
-    setControlledIso(country?.iso || null);
-    if (!getNationalNumber(phoneNumberControlled, country?.iso || null)) {
-      setPhoneNumberControlled(country?.code || null);
-    }
-  };
-
-  // --- Example Validation for Email/URL ---
-  const isValidEmail = useMemo(() => {
-    if (!emailValue) return false;
-    // Simple regex for demonstration
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue);
-  }, [emailValue]);
-
-  // Removed all the repetitive useMemo blocks for nationalNumber 1-5
-  // They are now simple const declarations above, using the helper function.
 
   return (
-    <div className="p-8 space-y-8">
-      <div>
-        <h2 className="text-xl font-sans font-bold mb-4">Static Examples</h2>
-        <div className="flex flex-wrap gap-4">
-          <Chip>Resting Chip</Chip>
-          <Chip selected>Selected Chip</Chip>
+    <div className="p-8 space-y-12 font-sans">
+      <section>
+        <h2 className="text-xl font-bold mb-4">Chip Component</h2>
+        <div className="flex flex-wrap gap-4 items-center">
+          <Chip
+            selected={selectedChip === "rest"}
+            onClick={() => setSelectedChip("rest")}
+          >
+            Resting Chip
+          </Chip>
+          <Chip
+            selected={selectedChip === "selected"}
+            onClick={() => setSelectedChip("selected")}
+          >
+            Selected Chip
+          </Chip>
           <Chip disabled>Disabled Chip</Chip>
         </div>
-      </div>
-
-      <div>
-        <h2 className="text-xl font-sans font-bold mb-4">
-          Interactive Example
-        </h2>
-        <p className="text-sm font-sans text-neutral-700 mb-4">
-          Click a chip to select it.
+        <p className="text-xs text-neutral-60 mt-2">
+          Selected: {selectedChip || "None"}
         </p>
-        <div className="flex flex-wrap gap-4">
-          <Chip
-            selected={selectedChip === "chip1"}
-            onClick={() => setSelectedChip("chip1")}
-          >
-            Option 1
-          </Chip>
-          <Chip
-            selected={selectedChip === "chip2"}
-            onClick={() => setSelectedChip("chip2")}
-          >
-            Option 2
-          </Chip>
-          <Chip
-            selected={selectedChip === "chip3"}
-            onClick={() => setSelectedChip("chip3")}
-          >
-            Option 3
-          </Chip>
-          <Chip disabled>Disabled Option</Chip>
-        </div>
-      </div>
-      {/* DatePicker Component Section */}
-      <section>
-        <h2 className="text-xl font-bold mb-4">DatePicker Component</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-start">
-          {/* Example 1: Basic DatePicker */}
-          <div>
-            <label className="block text-sm font-medium text-neutral-70 mb-1">
-              Basic DatePicker:
-            </label>
-            <DatePicker
-              value={selectedDate1}
-              onChange={setSelectedDate1}
-              placeholder="Select any date"
-            />
-            <p className="text-xs text-neutral-60 mt-1">
-              Selected: {selectedDate1 || "None"}
-            </p>
-          </div>
-
-          {/* Example 2: DatePicker with Initial Value */}
-          <div>
-            <label className="block text-sm font-medium text-neutral-70 mb-1">
-              With Initial Value:
-            </label>
-            <DatePicker
-              value={selectedDate2}
-              onChange={setSelectedDate2}
-              error={"This field is Not Valid"}
-            />
-            <p className="text-xs text-neutral-60 mt-1">
-              Selected: {selectedDate2 || "None"}
-            </p>
-          </div>
-
-          {/* Example 3: DatePicker with Min/Max Dates */}
-          <div>
-            <label className="block text-sm font-medium text-neutral-70 mb-1">
-              Range (Aug 1, 2022 - Oct 31, 2023):
-            </label>
-            <DatePicker
-              value={selectedDate3}
-              onChange={setSelectedDate3}
-              minDate="2022-08-01" // Minimum selectable date
-              maxDate="2023-10-31" // Maximum selectable date
-              placeholder="Select date in range"
-            />
-            <p className="text-xs text-neutral-60 mt-1">
-              Selected: {selectedDate3 || "None"}
-            </p>
-          </div>
-
-          {/* Example 4: Disabled DatePicker */}
-          <div>
-            <label className="block text-sm font-medium text-neutral-70 mb-1">
-              Disabled DatePicker:
-            </label>
-            <DatePicker
-              value={null}
-              onChange={() => {}} // No-op
-              disabled={true}
-              placeholder="Cannot select"
-            />
-            <p className="text-xs text-neutral-60 mt-1">
-              Selected: None (Disabled)
-            </p>
-          </div>
-        </div>
       </section>
 
-      {/* --- Phone Number Input Section --- */}
       <section>
         <h2 className="text-xl font-bold mb-4">
-          Phone Number Input (Controlled ISO)
+          Unified Input Component Examples
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-12 items-start">
-          {" "}
-          {/* Increased vertical gap */}
-          {/* Example 1: Basic */}
-          <div>
-            <PhoneNumberInput
-              label="Phone number (ID Default)"
-              required
-              value={phoneNumber1}
-              onChange={setPhoneNumber1}
-              selectedCountryIso={iso1} // Pass controlled ISO
-              onCountryChange={handleCountryChange1} // Handle country change
-              defaultCountryIso="ID" // Fallback if selectedCountryIso is null initially
-              disabledCountryIsos={["US", "GB"]}
-            />
-            <p className="text-xs text-neutral-60 mt-1">
-              Value: {phoneNumber1 || "None"} | ISO: {iso1 || "None"} | NatNum:{" "}
-              {nationalNumber1}
-            </p>
-          </div>
-          {/* Example 2: Initial Country Code (GB) */}
-          <div>
-            <PhoneNumberInput
-              label="UK Number (from value)"
-              value={phoneNumber2}
-              onChange={setPhoneNumber2}
-              selectedCountryIso={iso2} // Pass controlled ISO
-              onCountryChange={handleCountryChange2} // Handle country change
-              defaultCountryIso="ID" // Fallback
-            />
-            <p className="text-xs text-neutral-60 mt-1">
-              Value: {phoneNumber2 || "None"} | ISO: {iso2 || "None"} | NatNum:{" "}
-              {nationalNumber2}
-            </p>
-          </div>
-          {/* Example 3: Error State */}
-          <div>
-            <PhoneNumberInput
-              label="Phone with Error"
-              required
-              value={phoneNumber3}
-              onChange={setPhoneNumber3}
-              selectedCountryIso={iso3} // Pass controlled ISO
-              onCountryChange={handleCountryChange3} // Handle country change
-              error="Please enter a valid phone number."
-            />
-            <p className="text-xs text-neutral-60 mt-1">
-              Value: {phoneNumber3 || "None"} | ISO: {iso3 || "None"} | NatNum:{" "}
-              {nationalNumber3}
-            </p>
-          </div>
-          {/* Example 4: Disabled State */}
-          <div>
-            <PhoneNumberInput
-              label="Disabled Input"
-              value={phoneNumber4}
-              onChange={setPhoneNumber4}
-              selectedCountryIso={iso4} // Pass controlled ISO
-              onCountryChange={handleCountryChange4} // Handle country change (won't be called if disabled)
-              disabled={true}
-            />
-            <p className="text-xs text-neutral-60 mt-1">
-              Value: {phoneNumber4 || "None"} | ISO: {iso4 || "None"} (Disabled)
-              | NatNum: {nationalNumber4}
-            </p>
-          </div>
-          {/* Example 5: Controlled Country Selection (already done) */}
-          <div className="md:col-span-2">
-            <PhoneNumberInput
-              label="Phone Number (Externally Controlled Country)"
-              required
-              value={phoneNumberControlled}
-              onChange={setPhoneNumberControlled}
-              selectedCountryIso={controlledIso}
-              onCountryChange={handleCountryChangeControlled}
-              defaultCountryIso="JP"
-              placeholder="Enter phone number"
-            />
-            <p className="text-xs text-neutral-60 mt-1">
-              Full Value: {phoneNumberControlled || "None"} | Selected ISO:{" "}
-              {controlledIso || "None"} | National Num:{" "}
-              {nationalNumberControlled}
-            </p>
-            <div className="mt-2 space-x-2">
-              <button
-                onClick={() => setControlledIso("ID")}
-                className="text-xs p-1 border rounded bg-neutral-10"
-              >
-                Set ID
-              </button>
-              <button
-                onClick={() => setControlledIso("GB")}
-                className="text-xs p-1 border rounded bg-neutral-10"
-              >
-                Set GB
-              </button>
-              <button
-                onClick={() => setControlledIso("CA")}
-                className="text-xs p-1 border rounded bg-neutral-10"
-              >
-                Set CA
-              </button>
-              <button
-                onClick={() => setControlledIso(null)}
-                className="text-xs p-1 border rounded bg-neutral-10"
-              >
-                Set Null (Fallback to Default)
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
+        <form className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-16 items-start">
+          {inputFields.map((field) => {
+            let currentConfig: InputConfig = {
+              ...field.config,
+              ...field.stateProps,
+            } as InputConfig;
 
-      {/* --- Dropdown Input Section --- */}
-      <section>
-        <h2 className="text-xl font-bold mb-4">Dropdown Input</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-12 items-start">
-          {/* Example 1: Basic Dropdown */}
-          <div className="w-72">
-            {" "}
-            {/* Constrain width for example */}
-            <DropdownInput
-              label="Domicile (Basic)"
-              required
-              placeholder="Choose your domicile"
-              options={domicileOptions}
-              value={selectedDomicile1}
-              onChange={setSelectedDomicile1}
-            />
-            <p className="text-xs text-neutral-60 mt-1">
-              Selected ID: {selectedDomicile1?.id || "None"}
-            </p>
-          </div>
+            const currentValue = formState[field.stateKey];
+            const currentPhoneIso = field.countryStateKey
+              ? phoneIsoState[field.countryStateKey]
+              : undefined;
 
-          {/* Example 2: Pre-selected & Error */}
-          <div className="w-72">
-            <DropdownInput
-              label="Domicile (Pre-selected & Error)"
-              required
-              placeholder="Choose your domicile"
-              options={domicileOptions}
-              value={selectedDomicile2}
-              onChange={setSelectedDomicile2}
-              error="This field is required" // Example error message
-            />
-            <p className="text-xs text-neutral-60 mt-1">
-              Selected ID: {selectedDomicile2?.id || "None"}
-            </p>
-          </div>
+            let dynamicError: string | boolean | undefined =
+              currentConfig.error;
 
-          {/* Example 3: Disabled */}
-          <div className="w-72">
-            <DropdownInput
-              label="Domicile (Disabled)"
-              placeholder="Cannot select domicile"
-              options={domicileOptions}
-              value={null} // Usually null when disabled, unless pre-filled
-              onChange={() => {}} // No-op
-              disabled={true}
-            />
-            <p className="text-xs text-neutral-60 mt-1">
-              Selected ID: None (Disabled)
-            </p>
-          </div>
+            if (
+              currentConfig.required &&
+              !currentConfig.disabled &&
+              !currentValue
+            ) {
+              if (field.id === "name-error-req")
+                dynamicError = "Name is required";
+              if (field.id === "pronoun-error")
+                dynamicError = "Please select a pronoun";
+              if (field.id === "domicile-error")
+                dynamicError = "Domicile is required";
+            }
 
-          {/* Example 4: Custom Popover Width (Example, matches trigger width) */}
-          <div className="w-72">
-            <DropdownInput
-              label="Domicile (Popover Matches Trigger)"
-              placeholder="Choose domicile"
-              options={domicileOptions}
-              value={selectedDomicile1} // Reusing state for example
-              onChange={setSelectedDomicile1}
-            />
-            <p className="text-xs text-neutral-60 mt-1">
-              Selected ID: {selectedDomicile1?.id || "None"}
-            </p>
-          </div>
-
-          {/* Example 5: Fixed Popover Width */}
-          <div className="w-72">
-            <DropdownInput
-              label="Domicile (Fixed Popover Width)"
-              placeholder="Choose domicile"
-              options={domicileOptions}
-              value={selectedDomicile1} // Reusing state for example
-              onChange={setSelectedDomicile1}
-            />
-            <p className="text-xs text-neutral-60 mt-1">
-              Selected ID: {selectedDomicile1?.id || "None"}
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* --- Text Input Section --- */}
-      <section>
-        <h2 className="text-xl font-bold mb-4">Text Input</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-12 items-start">
-          {/* Example 1: Basic */}
-          <div className="w-72">
-            <TextInput
-              label="Full Name"
-              required
-              placeholder="Enter your full name"
-              value={textValue1}
-              onChange={(e) => setTextValue1(e.target.value)}
-              name="fullName"
-              maxLength={50} // Example standard prop
-            />
-            <p className="text-xs text-neutral-60 mt-1">
-              Value: {textValue1 || "Empty"}
-            </p>
-          </div>
-
-          {/* Example 2: With Initial Value */}
-          <div className="w-72">
-            <TextInput
-              label="Username"
-              placeholder="Enter username"
-              value={textValue2}
-              onChange={(e) => setTextValue2(e.target.value)}
-            />
-            <p className="text-xs text-neutral-60 mt-1">
-              Value: {textValue2 || "Empty"}
-            </p>
-          </div>
-
-          {/* Example 3: Error State */}
-          <div className="w-72">
-            <TextInput
-              label="Required Field"
-              required
-              placeholder="Cannot be empty"
-              value={textValue3}
-              onChange={(e) => setTextValue3(e.target.value)}
-              // Example: Show error if field is required but empty after initial interaction
-              error={!textValue3 ? "This field is required" : false}
-            />
-            <p className="text-xs text-neutral-60 mt-1">
-              Value: {textValue3 || "Empty"}
-            </p>
-          </div>
-
-          {/* Example 4: Disabled State */}
-          <div className="w-72">
-            <TextInput
-              label="Read Only Field"
-              value={textValue4}
-              onChange={(e) => setTextValue4(e.target.value)}
-              disabled={true}
-            />
-            <p className="text-xs text-neutral-60 mt-1">
-              Value: {textValue4} (Disabled)
-            </p>
-          </div>
-
-          {/* Example 5: Email with Success Message */}
-          <div className="w-72">
-            <TextInput
-              label="Email Address"
-              required
-              type="email"
-              placeholder="Enter your email"
-              value={emailValue}
-              onChange={(e) => setEmailValue(e.target.value)}
-              // Show success message only if valid and not empty
-              successMessage={
-                isValidEmail ? "Email format looks good!" : undefined
+            if (
+              currentConfig.type === "email" &&
+              field.id === "email-validation"
+            ) {
+              const emailVal = currentValue as string | null;
+              if (emailVal) {
+                const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal);
+                if (isValid) {
+                  currentConfig.successMessage = "Email looks good!";
+                  dynamicError = false;
+                } else {
+                  dynamicError = "Invalid email format";
+                }
+              } else if (currentConfig.required) {
+                dynamicError = "Email is required";
               }
-              // Show error if not empty AND not valid
-              error={
-                emailValue && !isValidEmail ? "Invalid email format" : false
-              }
-            />
-            <p className="text-xs text-neutral-60 mt-1">
-              Value: {emailValue || "Empty"}
-            </p>
-          </div>
+            }
 
-          {/* Example 6: Password */}
-          <div className="w-72">
-            <TextInput
-              label="Password"
-              required
-              type="password"
-              placeholder="Enter password"
-              value={passwordValue} // Typically password inputs aren't controlled directly with display value
-              onChange={(e) => setPasswordValue(e.target.value)} // Handle change appropriately
-            />
-            <p className="text-xs text-neutral-60 mt-1">Value: ******</p>
-          </div>
-        </div>
-      </section>
+            currentConfig.error = dynamicError;
 
-      <section>
-        <h2 className="text-xl font-bold mb-4">Radio Input</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-12 items-start">
-          {/* Example 1: Basic */}
-          <div>
-            <RadioInput
-              label="Pronoun (Gender)"
-              required
-              options={pronounOptions}
-              selectedValue={selectedPronoun}
-              onChange={setSelectedPronoun}
-              name="pronoun-group-1" // Unique name for the group
-            />
-            <p className="text-xs text-neutral-60 mt-2">
-              Selected: {selectedPronoun || "None"}
-            </p>
-          </div>
+            if (currentConfig.type === "phone" && field.countryStateKey) {
+              currentConfig.selectedCountryIso = currentPhoneIso;
+            }
 
-          {/* Example 2: Pre-selected & Disabled */}
-          <div>
-            <RadioInput
-              label="Delivery Option (Disabled)"
-              options={[
-                { value: "standard", label: "Standard Shipping" },
-                { value: "express", label: "Express Shipping" },
-              ]}
-              selectedValue={"standard"} // Pre-select standard
-              onChange={() => {}} // No-op
-              name="delivery-group-disabled"
-              disabled={true} // Disable the whole group
-            />
-            <p className="text-xs text-neutral-60 mt-2">
-              Selected: standard (Disabled)
-            </p>
-          </div>
+            const onChangeAdapter = (newValue: UnifiedChangeValue) => {
+              handleChange(field.stateKey, newValue);
+            };
+            const onCountryChangeAdapter =
+              field.countryStateKey && currentConfig.type === "phone"
+                ? (country: Country | null) =>
+                    handlePhoneCountryChange(field.countryStateKey!, country)
+                : undefined;
 
-          {/* Example 3: Error State */}
-          <div>
-            <RadioInput
-              label="Confirmation (Error)"
-              required
-              options={[
-                { value: "yes", label: "Yes" },
-                { value: "no", label: "No" },
-              ]}
-              selectedValue={selectedOption}
-              onChange={setSelectedOption}
-              name="confirm-group"
-              // Example error: show if required and nothing selected
-              error={!selectedOption ? "Please select an option" : false}
-            />
-            <p className="text-xs text-neutral-60 mt-2">
-              Selected: {selectedOption || "None"}
-            </p>
-          </div>
-        </div>
-
-        {/* Example 4: Static Error State */}
-        <div>
-          <RadioInput
-            label="Agreement (Static Error)"
-            required
-            options={[
-              { value: "agree", label: "I Agree" },
-              { value: "disagree", label: "I Disagree" },
-            ]}
-            selectedValue={errorRadioValue} // Use separate state
-            onChange={setErrorRadioValue}
-            name="agreement-group-error"
-            // Always show error message
-            error={"You must agree to continue"}
-          />
-          <p className="text-xs text-neutral-60 mt-2">
-            Selected: {errorRadioValue || "None"}
-          </p>
-        </div>
+            return (
+              <InputWrapper key={field.id} title={field.title}>
+                <Input
+                  config={currentConfig}
+                  value={currentValue}
+                  onChange={onChangeAdapter}
+                  onCountryChange={onCountryChangeAdapter}
+                />
+                {currentConfig.type === "dropdown" ? (
+                  <StateDisplay
+                    value={(currentValue as DropdownOption | null)?.label}
+                    prefix="Selected: "
+                  />
+                ) : currentConfig.type === "password" ? (
+                  <StateDisplay value={currentValue ? "******" : null} />
+                ) : currentConfig.type === "phone" ? (
+                  <StateDisplay
+                    value={currentValue as string | null}
+                    prefix={`ISO: ${currentPhoneIso ?? "Derived"} | Val: `}
+                  />
+                ) : (
+                  <StateDisplay value={currentValue as string | null} />
+                )}
+              </InputWrapper>
+            );
+          })}
+        </form>
       </section>
     </div>
   );
 }
+
+/**
+ * A simple wrapper component for displaying input examples in the playground.
+ * @param {object} props - Component props.
+ * @param {string} props.title - The title to display above the input.
+ * @param {React.ReactNode} props.children - The input component and state display to render.
+ * @returns {React.ReactElement} The wrapped input example.
+ */
+const InputWrapper: React.FC<{ title: string; children: React.ReactNode }> = ({
+  title,
+  children,
+}) => (
+  <div className="border border-dashed border-neutral-300 p-4 rounded-md min-h-[100px]">
+    <h3 className="text-md font-semibold mb-3 text-neutral-700">{title}</h3>
+    {children}
+  </div>
+);
+
+/**
+ * A small component to display the current state value below an input example.
+ * @param {object} props - Component props.
+ * @param {string | null | undefined} props.value - The value to display.
+ * @param {string} [props.prefix="Value: "] - Optional prefix string.
+ * @returns {React.ReactElement} The state display paragraph.
+ */
+const StateDisplay: React.FC<{
+  value: string | null | undefined;
+  prefix?: string;
+}> = ({ value, prefix = "Value: " }) => (
+  <p className="text-xs text-neutral-60 mt-1 h-4">
+    {prefix}
+    {value || "None"}
+  </p>
+);

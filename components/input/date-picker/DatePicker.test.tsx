@@ -17,7 +17,7 @@ import { useDatePickerPopover } from "@/hooks/date-picker-popover/useDatePickerP
  * This allows controlling the hook's return values (isOpen, popoverElement, etc.)
  * for testing the DatePicker's behavior in isolation.
  */
-jest.mock("../../hooks/date-picker-popover/useDatePickerPopover");
+jest.mock("../../../hooks/date-picker-popover/useDatePickerPopover");
 const mockedUseDatePickerPopover = useDatePickerPopover as jest.Mock;
 
 /**

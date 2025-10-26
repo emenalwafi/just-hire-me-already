@@ -94,9 +94,9 @@ const mockUS: Country = { name: "United States", code: "+1", iso: "US" };
  * a mock `popoverElement`.
  * - `getAllCountryData`: Mocked to return a static array `[mockIndonesia, mockUS]`.
  */
-jest.mock("../../hooks/country-phone-popover/useCountryPhonePopover", () => {
+jest.mock("../../../hooks/country-phone-popover/useCountryPhonePopover", () => {
   const originalModule = jest.requireActual(
-    "../../hooks/country-phone-popover/useCountryPhonePopover"
+    "../../../hooks/country-phone-popover/useCountryPhonePopover"
   );
   return {
     ...originalModule,

@@ -19,9 +19,15 @@ import TextInput from "./TextInput"; // Adjust import path as needed
  * and pass through all props (like `className`) to allow style-checking.
  */
 jest.mock("@iconscout/react-unicons", () => ({
-  UilCheckCircle: (props: any) => <span data-testid="icon-check" {...props} />,
-  UilEye: (props: any) => <span data-testid="icon-eye" {...props} />,
-  UilEyeSlash: (props: any) => <span data-testid="icon-eye-slash" {...props} />,
+  UilCheckCircle: (props: { className: string }) => (
+    <span data-testid="icon-check" {...props} />
+  ),
+  UilEye: (props: { className: string }) => (
+    <span data-testid="icon-eye" {...props} />
+  ),
+  UilEyeSlash: (props: { className: string }) => (
+    <span data-testid="icon-eye-slash" {...props} />
+  ),
 }));
 
 // --- Test Setup ---
