@@ -143,7 +143,7 @@ describe("TextInput", () => {
       // Check ARIA attributes
       expect(input).toHaveAttribute("aria-invalid", "false");
       expect(input).toHaveAttribute("aria-describedby", "email-field-message");
-      expect(successMsg.parentElement?.parentElement).toHaveAttribute(
+      expect(successMsg.parentElement).toHaveAttribute(
         "id",
         "email-field-message"
       );

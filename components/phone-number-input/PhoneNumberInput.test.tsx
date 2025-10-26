@@ -3,63 +3,74 @@ import "@testing-library/jest-dom";
 import PhoneNumberInput, { PhoneNumberInputProps } from "./PhoneNumberInput";
 import { Country } from "@/hooks/country-phone-popover/useCountryPhonePopover";
 
+/**
+ * @file Test suite for the PhoneNumberInput component.
+ * @description This file contains unit tests for the PhoneNumberInput,
+ * verifying its rendering, prop-driven state logic (useEffect),
+ * visual states (disabled, error, focus), and user interactions.
+ * It heavily mocks the `useCountryPhonePopover` hook, `libphonenumber-js`,
+ * and icon/flag libraries to isolate the component's logic.
+ */
+
 // --- Mocks ---
 
-// 1. Mock the custom hook `useCountryPhonePopover`
-// We need to capture the `onSelectCountry` callback
+/**
+ * A variable to capture the `onSelectCountry` callback passed to the mock hook.
+ */
 let mockOnSelectCountry: (country: Country) => void;
+/**
+ * A mock Jest function to capture calls to `setIsOpen` from the mock hook.
+ */
 const mockSetCountryPopoverOpen = jest.fn();
 
-jest.mock("../../hooks/country-phone-popover/useCountryPhonePopover", () => ({
-  ...jest.requireActual(
-    "../../hooks/country-phone-popover/useCountryPhonePopover"
-  ),
-  useCountryPhonePopover: jest.fn(
-    ({ onSelectCountry }: { onSelectCountry: (country: Country) => void }) => {
-      // Capture the callback to simulate selection
-      mockOnSelectCountry = onSelectCountry;
-      return {
-        isOpen: false,
-        setIsOpen: mockSetCountryPopoverOpen,
-        // Render a simple div so we can check if it's "rendered"
-        popoverElement: <div data-testid="mock-popover" />,
-      };
-    }
-  ),
-}));
-
-// 2. Mock `libphonenumber-js/max`
+/**
+ * A mock Jest function to capture calls to the `AsYouType` constructor.
+ */
 const mockAsYouType = jest.fn();
+/**
+ * A mock Jest function to capture calls to `parsePhoneNumberFromString`
+ * and allow per-test implementations.
+ */
 const mockParsePhoneNumberFromString = jest.fn();
 
+/**
+ * Mocks the `libphonenumber-js/max` library.
+ * `AsYouType` is mocked to record the ISO it was called with and
+ * to simply echo back the digits it receives for simple testing.
+ * `parsePhoneNumberFromString` is mocked with a Jest function.
+ */
 jest.mock("libphonenumber-js/max", () => ({
   ...jest.requireActual("libphonenumber-js/max"),
   AsYouType: jest.fn().mockImplementation(function (iso) {
-    mockAsYouType(iso); // Record which country it was constructed with
+    mockAsYouType(iso);
     const digits = { current: "" };
     return {
       input: (val: string) => {
         digits.current = val;
       },
       getNumber: () => ({
-        nationalNumber: digits.current, // Just return the digits for simple testing
+        nationalNumber: digits.current,
       }),
     };
   }),
   parsePhoneNumberFromString: (value: string) => {
-    // We'll set up specific mocks in the tests
     return mockParsePhoneNumberFromString(value);
   },
 }));
 
-// 3. Mock the icon library
+/**
+ * Mocks the `@iconscout/react-unicons` library.
+ */
 jest.mock("@iconscout/react-unicons", () => ({
   UilAngleDown: (props: { className: string }) => (
     <span data-testid="icon-angle-down" className={props.className} />
   ),
 }));
 
-// 4. Mock the entire flag icon library
+/**
+ * Mocks the `country-flag-icons/react/3x2` library
+ * to provide simple `<span>` elements for specific country codes.
+ */
 jest.mock("country-flag-icons/react/3x2", () => ({
   __esModule: true,
   ID: (props: { title: string }) => (
@@ -72,18 +83,23 @@ jest.mock("country-flag-icons/react/3x2", () => ({
 
 // --- Test Setup ---
 
-// Mock country data that `getAllCountryData` (used inside the component) will return
+/** Mock `Country` data objects for testing. */
 const mockIndonesia: Country = { name: "Indonesia", code: "+62", iso: "ID" };
+/** Mock `Country` data objects for testing. */
 const mockUS: Country = { name: "United States", code: "+1", iso: "US" };
 
-// We need to mock the `getAllCountryData` *used by the component*
+/**
+ * Mocks the `useCountryPhonePopover` hook and its related `getAllCountryData` utility.
+ * - `useCountryPhonePopover`: Captures the `onSelectCountry` callback and provides
+ * a mock `popoverElement`.
+ * - `getAllCountryData`: Mocked to return a static array `[mockIndonesia, mockUS]`.
+ */
 jest.mock("../../hooks/country-phone-popover/useCountryPhonePopover", () => {
   const originalModule = jest.requireActual(
     "../../hooks/country-phone-popover/useCountryPhonePopover"
   );
   return {
     ...originalModule,
-    // Mock the hook
     useCountryPhonePopover: jest.fn(
       ({
         onSelectCountry,
@@ -98,12 +114,14 @@ jest.mock("../../hooks/country-phone-popover/useCountryPhonePopover", () => {
         };
       }
     ),
-    // Mock the data utility
     getAllCountryData: () => [mockIndonesia, mockUS],
   };
 });
 
-// Helper: Get the component's main elements
+/**
+ * Helper function to get the primary elements of the component for testing.
+ * @returns {object} An object containing the `wrapper`, `input`, and `countryButton`.
+ */
 const getElements = () => {
   const wrapper = screen.getByRole("button", {
     name: /Select country code/,
@@ -117,21 +135,31 @@ const getElements = () => {
   return { wrapper, input, countryButton };
 };
 
+/**
+ * @describe Main test suite for the PhoneNumberInput component.
+ */
 describe("PhoneNumberInput", () => {
   let mockOnChange: jest.Mock;
 
+  /**
+   * @beforeEach Resets all mock functions and clears mock history
+   * before each test to ensure isolation.
+   */
   beforeEach(() => {
-    // Reset mocks before each test
     mockOnChange = jest.fn();
     mockSetCountryPopoverOpen.mockClear();
     mockAsYouType.mockClear();
     mockParsePhoneNumberFromString.mockClear();
-    // Set a default mock for parsing
     mockParsePhoneNumberFromString.mockReturnValue(undefined);
   });
 
-  // --- Rendering and Initial State ---
+  /**
+   * @describe Tests for the component's initial rendering based on props.
+   */
   describe("Rendering and Initial State", () => {
+    /**
+     * @it Verifies that the label and required asterisk (`*`) are rendered correctly.
+     */
     it("should render with label and required asterisk", () => {
       render(
         <PhoneNumberInput
@@ -142,12 +170,14 @@ describe("PhoneNumberInput", () => {
           selectedCountryIso="ID"
         />
       );
-      // The label is in a span, and the asterisk in another.
       expect(screen.getByText("Phone")).toBeInTheDocument();
       expect(screen.getByText("*")).toBeInTheDocument();
       expect(screen.getByText("Phone").nextSibling?.textContent).toBe("*");
     });
 
+    /**
+     * @it Verifies that a string error message is rendered when provided.
+     */
     it("should render an error message string", () => {
       render(
         <PhoneNumberInput
@@ -160,6 +190,9 @@ describe("PhoneNumberInput", () => {
       expect(screen.getByText("This field is required")).toBeInTheDocument();
     });
 
+    /**
+     * @it Verifies that the input placeholder is displayed correctly.
+     */
     it("should show placeholder", () => {
       render(
         <PhoneNumberInput
@@ -175,23 +208,33 @@ describe("PhoneNumberInput", () => {
     });
   });
 
-  // --- Prop-driven State Logic (useEffect) ---
+  /**
+   * @describe Tests the internal `useEffect` logic that derives the
+   * displayed country and national number from props (`value`, `selectedCountryIso`).
+   */
   describe("Prop-driven State Logic (useEffect)", () => {
+    /**
+     * @it Verifies that the `selectedCountryIso` prop takes precedence over
+     * `value` or `defaultCountryIso` for determining the country.
+     */
     it("should prioritize selectedCountryIso prop and render correct flag", () => {
       render(
         <PhoneNumberInput
           value={null}
           onChange={mockOnChange}
-          selectedCountryIso="US" // Prioritize US
-          defaultCountryIso="ID" // Fallback ID
+          selectedCountryIso="US"
+          defaultCountryIso="ID"
         />
       );
       expect(screen.getByText("+1")).toBeInTheDocument();
-      // Check that the correct flag ISO is rendered
       expect(screen.getByTestId("flag-US")).toBeInTheDocument();
       expect(screen.queryByTestId("flag-ID")).not.toBeInTheDocument();
     });
 
+    /**
+     * @it Verifies that the component correctly parses the `value` prop
+     * to determine the country if `selectedCountryIso` is not provided.
+     */
     it("should derive country from value if prop is missing and render correct flag", () => {
       mockParsePhoneNumberFromString.mockImplementation((val: string) =>
         val === "+18005551234"
@@ -208,14 +251,17 @@ describe("PhoneNumberInput", () => {
         />
       );
 
-      expect(screen.getByText("+1")).toBeInTheDocument(); // Derived from value
-      // Check that the correct flag ISO is rendered
+      expect(screen.getByText("+1")).toBeInTheDocument();
       expect(screen.getByTestId("flag-US")).toBeInTheDocument();
       expect(screen.queryByTestId("flag-ID")).not.toBeInTheDocument();
       const { input } = getElements();
-      expect(input.value).toBe("8005551234"); // National number is extracted
+      expect(input.value).toBe("8005551234");
     });
 
+    /**
+     * @it Verifies that `defaultCountryIso` is used when both `value`
+     * and `selectedCountryIso` are null or invalid.
+     */
     it("should use defaultCountryIso as a fallback and render correct flag", () => {
       render(
         <PhoneNumberInput
@@ -226,13 +272,15 @@ describe("PhoneNumberInput", () => {
         />
       );
       expect(screen.getByText("+62")).toBeInTheDocument();
-      // Check that the correct flag ISO is rendered
       expect(screen.getByTestId("flag-ID")).toBeInTheDocument();
       expect(screen.queryByTestId("flag-US")).not.toBeInTheDocument();
     });
 
+    /**
+     * @it Verifies that the national number input is cleared if the `value` prop
+     * (e.g., a US number) conflicts with the `selectedCountryIso` prop (e.g., ID).
+     */
     it("should reset national number if value does not match derived country", () => {
-      // Value is US, but prop forces ID. They conflict.
       mockParsePhoneNumberFromString.mockImplementation((val: string) =>
         val === "+18005551234"
           ? { country: "US", nationalNumber: "8005551234" }
@@ -243,21 +291,26 @@ describe("PhoneNumberInput", () => {
         <PhoneNumberInput
           value="+18005551234"
           onChange={mockOnChange}
-          selectedCountryIso="ID" // Force ID
+          selectedCountryIso="ID"
         />
       );
 
-      expect(screen.getByText("+62")).toBeInTheDocument(); // Prop wins
-      // Check that the correct flag ISO is rendered
+      expect(screen.getByText("+62")).toBeInTheDocument();
       expect(screen.getByTestId("flag-ID")).toBeInTheDocument();
       const { input } = getElements();
-      // Since value "+1..." doesn't match country "+62", national num is reset
       expect(input.value).toBe("");
     });
   });
 
-  // --- Visual States (Classes) ---
+  /**
+   * @describe Tests for CSS classes applied in different component states
+   * (disabled, error, focus).
+   */
   describe("Visual States (Classes)", () => {
+    /**
+     * @it Verifies that disabled-related classes and attributes are applied
+     * when the `disabled` prop is true.
+     */
     it("should apply disabled styles and classes", () => {
       render(
         <PhoneNumberInput
@@ -270,21 +323,20 @@ describe("PhoneNumberInput", () => {
       const { wrapper, input, countryButton } = getElements();
       const flagContainer = screen.getByTestId("flag-ID").parentElement;
 
-      // Check wrapper classes
       expect(wrapper).toHaveClass("bg-neutral-30 outline-neutral-40");
       expect(wrapper).toHaveClass("cursor-not-allowed");
-      // Check elements
       expect(input).toBeDisabled();
       expect(countryButton).toBeDisabled();
-      // Check text and icon classes
       expect(screen.getByText("+62")).toHaveClass("text-neutral-60");
       expect(screen.getByTestId("icon-angle-down")).toHaveClass(
         "text-neutral-60"
       );
-      // Check flag container classes
       expect(flagContainer).toHaveClass("border-neutral-60 opacity-60");
     });
 
+    /**
+     * @it Verifies that error-related classes are applied when the `error` prop is true.
+     */
     it("should apply error styles and classes", () => {
       render(
         <PhoneNumberInput
@@ -295,14 +347,16 @@ describe("PhoneNumberInput", () => {
         />
       );
       const { wrapper } = getElements();
-      // Check wrapper classes
       expect(wrapper).toHaveClass("bg-white outline-danger-main");
-      // Check that it does NOT have default/focus/disabled classes
       expect(wrapper).not.toHaveClass("bg-neutral-10");
       expect(wrapper).not.toHaveClass("outline-primary-main");
       expect(wrapper).not.toHaveClass("bg-neutral-30");
     });
 
+    /**
+     * @it Verifies that focus-related classes are applied on input focus
+     * and removed on blur.
+     */
     it("should apply focus/blur styles and classes", () => {
       render(
         <PhoneNumberInput
@@ -313,20 +367,17 @@ describe("PhoneNumberInput", () => {
       );
       const { wrapper, input } = getElements();
 
-      // Default (blurred) state
       expect(wrapper).toHaveClass(
         "bg-neutral-10 outline-neutral-40 hover:outline-neutral-70"
       );
       expect(wrapper).not.toHaveClass("outline-primary-main");
 
-      // Focus
       act(() => {
         fireEvent.focus(input);
       });
       expect(wrapper).toHaveClass("bg-white outline-primary-main");
       expect(wrapper).not.toHaveClass("bg-neutral-10");
 
-      // Blur
       act(() => {
         fireEvent.blur(input);
       });
@@ -337,8 +388,14 @@ describe("PhoneNumberInput", () => {
     });
   });
 
-  // --- User Interactions ---
+  /**
+   * @describe Tests how the component responds to user events like
+   * clicks and typing.
+   */
   describe("User Interactions", () => {
+    /**
+     * @it Verifies that clicking the country selector button calls `setIsOpen(true)`.
+     */
     it("should open popover when country button is clicked", () => {
       render(
         <PhoneNumberInput
@@ -354,6 +411,10 @@ describe("PhoneNumberInput", () => {
       expect(mockSetCountryPopoverOpen).toHaveBeenCalledWith(true);
     });
 
+    /**
+     * @it Verifies that typing in the input triggers the `AsYouType` formatter
+     * and calls `onChange` with the full international number.
+     */
     it("should format input as user types", () => {
       const { rerender } = render(
         <PhoneNumberInput
@@ -378,19 +439,21 @@ describe("PhoneNumberInput", () => {
         fireEvent.change(input, { target: { value: "8123456" } });
       });
 
-      // 1. `AsYouType` was constructed with the correct ISO (on render and rerender)
       expect(mockAsYouType).toHaveBeenCalledWith("ID");
-      // 2. `onChange` is called with the full international number
       expect(mockOnChange).toHaveBeenCalledWith("+628123456");
-      // 3. The input value is set to the formatted number *after* rerender
-      expect(input.value).toBe("8123456"); // Our mock just returns the digits
+      expect(input.value).toBe("8123456");
     });
 
+    /**
+     * @it Verifies the full flow of selecting a new country from the popover,
+     * checking that `onCountryChange` and `onChange` are called correctly
+     * and the UI (flag, code, number) updates.
+     */
     it("should update country, flag, and number when selected from popover", () => {
       const mockOnCountryChange = jest.fn();
 
       let props: PhoneNumberInputProps = {
-        value: "+628123", // Start with ID
+        value: "+628123",
         onChange: mockOnChange,
         onCountryChange: mockOnCountryChange,
         selectedCountryIso: "ID",
@@ -399,8 +462,8 @@ describe("PhoneNumberInput", () => {
       const { rerender } = render(<PhoneNumberInput {...props} />);
 
       const { input } = getElements();
-      expect(input.value).toBe("8123"); // Initial national number
-      expect(screen.getByTestId("flag-ID")).toBeInTheDocument(); // Initial flag
+      expect(input.value).toBe("8123");
+      expect(screen.getByTestId("flag-ID")).toBeInTheDocument();
 
       mockOnChange.mockImplementation((newValue) => {
         props = { ...props, value: newValue };
@@ -410,25 +473,15 @@ describe("PhoneNumberInput", () => {
         props = { ...props, selectedCountryIso: newCountry?.iso || null };
         rerender(<PhoneNumberInput {...props} />);
       });
-      // Simulate user selecting 'US' from the popover
       act(() => {
-        // This function was captured by our hook mock
         mockOnSelectCountry(mockUS);
       });
 
-      // 1. Country display updates
       expect(screen.getByText("+1")).toBeInTheDocument();
-      // Check that the flag ISO has changed
       expect(screen.getByTestId("flag-US")).toBeInTheDocument();
       expect(screen.queryByTestId("flag-ID")).not.toBeInTheDocument();
-
-      // 2. `onCountryChange` prop is called
       expect(mockOnCountryChange).toHaveBeenCalledWith(mockUS);
-
-      // 3. `onChange` prop is called with the *new* country code + *old* digits
       expect(mockOnChange).toHaveBeenCalledWith("+18123");
-
-      // 4. The input value reflects the national number of the new value
       expect(input.value).toBe("8123");
     });
   });

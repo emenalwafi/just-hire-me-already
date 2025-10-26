@@ -3,13 +3,28 @@ import "@testing-library/jest-dom";
 import DatePicker from "./DatePicker"; // Adjust this import path as needed
 import { useDatePickerPopover } from "@/hooks/date-picker-popover/useDatePickerPopover"; // Adjust this import path as needed
 
+/**
+ * @file Test suite for the DatePicker component.
+ * @description This file contains unit tests for the DatePicker, verifying its
+ * rendering, states (disabled, error), interactions, and prop handling.
+ * It uses a mock of the `useDatePickerPopover` hook to isolate the component's behavior.
+ */
+
 // --- Mocks ---
 
-// 1. Mock the useDatePickerPopover hook
+/**
+ * Mocks the `useDatePickerPopover` hook.
+ * This allows controlling the hook's return values (isOpen, popoverElement, etc.)
+ * for testing the DatePicker's behavior in isolation.
+ */
 jest.mock("../../hooks/date-picker-popover/useDatePickerPopover");
 const mockedUseDatePickerPopover = useDatePickerPopover as jest.Mock;
 
-// 2. Mock the icon library
+/**
+ * Mocks the `@iconscout/react-unicons` library.
+ * Replaces icons with simple `<span>` elements for easy testing,
+ * passing through props like `className` for style verification.
+ */
 jest.mock("@iconscout/react-unicons", () => ({
   UilCalendarAlt: (props: { className: string }) => (
     <span data-testid="icon-calendar" className={props.className} />
@@ -21,9 +36,13 @@ jest.mock("@iconscout/react-unicons", () => ({
 
 // --- Test Setup ---
 
-// Create mock functions and default values for the hook
 const mockSetIsOpen = jest.fn();
 const mockPopoverElement = <div data-testid="mock-popover" />;
+
+/**
+ * Default return value for the mocked `useDatePickerPopover` hook.
+ * Used to reset the hook's state before each test.
+ */
 const defaultMockHookValue = {
   isOpen: false,
   setIsOpen: mockSetIsOpen,
@@ -32,15 +51,24 @@ const defaultMockHookValue = {
   containerRef: { current: null },
 };
 
+/**
+ * @describe Main test suite for the DatePicker component.
+ */
 describe("DatePicker Component", () => {
+  /**
+   * @beforeEach Resets all mock functions and restores the default
+   * mock return value for `useDatePickerPopover` before each test.
+   */
   beforeEach(() => {
-    // Reset all mocks before each test
     mockSetIsOpen.mockClear();
     mockedUseDatePickerPopover.mockClear();
-    // Set the default return value for the mocked hook
     mockedUseDatePickerPopover.mockReturnValue(defaultMockHookValue);
   });
 
+  /**
+   * @it Verifies that the component renders the label, placeholder text, and icons
+   * when in its default state with no value.
+   */
   it("should render the label, placeholder, and icons", () => {
     render(
       <DatePicker
@@ -57,21 +85,27 @@ describe("DatePicker Component", () => {
     expect(screen.getByTestId("icon-angle-down")).toBeInTheDocument();
   });
 
+  /**
+   * @it Verifies that the required asterisk (`*`) is rendered next to the label
+   * when the `required` prop is true.
+   */
   it("should render the required asterisk next to the label", () => {
     render(
       <DatePicker label="Due Date" value={null} onChange={jest.fn()} required />
     );
 
-    // Check for the label and the asterisk separately
     expect(screen.getByText("Due Date")).toBeInTheDocument();
     const asterisk = screen.getByText("*");
     expect(asterisk).toBeInTheDocument();
     expect(asterisk).toHaveClass("text-danger-main");
   });
 
+  /**
+   * @it Verifies that the component displays the correctly formatted date string
+   * (using 'PPP' format) when a `value` is provided.
+   */
   it("should render the formatted date when a value is provided", () => {
     const testDate = new Date("2025-10-26T00:00:00.000Z");
-    // Mock the hook to return the parsed date object
     mockedUseDatePickerPopover.mockReturnValue({
       ...defaultMockHookValue,
       selectedDate: testDate,
@@ -79,48 +113,56 @@ describe("DatePicker Component", () => {
 
     render(<DatePicker value="2025-10-26" onChange={jest.fn()} />);
 
-    // The component formats this date using 'PPP'
     const formattedDate = screen.getByText("October 26th, 2025");
     expect(formattedDate).toBeInTheDocument();
-    // Check for the "has value" text color
     expect(formattedDate).toHaveClass("text-neutral-90");
-    // Placeholder should not be present
     expect(screen.queryByText("Select date")).not.toBeInTheDocument();
   });
 
+  /**
+   * @it Verifies that the component applies disabled attributes and styles
+   * when the `disabled` prop is true.
+   */
   it("should render in a disabled state", () => {
     render(<DatePicker value={null} onChange={jest.fn()} disabled />);
 
     const button = screen.getByRole("button");
     expect(button).toBeDisabled();
     expect(button).toHaveClass("cursor-not-allowed bg-neutral-30");
-
-    // Check icon color in disabled state
     expect(screen.getByTestId("icon-calendar")).toHaveClass("text-neutral-60");
   });
 
+  /**
+   * @it Verifies that clicking the component's button does not call `setIsOpen`
+   * when the component is disabled.
+   */
   it("should not open popover when disabled button is clicked", () => {
     render(<DatePicker value={null} onChange={jest.fn()} disabled />);
 
     const button = screen.getByRole("button");
     fireEvent.click(button);
 
-    // The hook's setIsOpen function should not have been called
     expect(mockSetIsOpen).not.toHaveBeenCalled();
   });
 
+  /**
+   * @it Verifies that the component applies error styles (outline)
+   * when `error` prop is `true`, but does not render a message.
+   */
   it("should show error state (boolean)", () => {
     render(<DatePicker value={null} onChange={jest.fn()} error />);
 
     const button = screen.getByRole("button");
     expect(button).toHaveClass("outline-danger-main");
-
-    // Should not display an error message if `error` is just `true`
     expect(
       screen.queryByText(/This field is required/)
     ).not.toBeInTheDocument();
   });
 
+  /**
+   * @it Verifies that the component applies error styles and renders the
+   * error message when `error` prop is a string.
+   */
   it("should show error state with a helper message", () => {
     const errorMessage = "This field is required.";
     render(
@@ -130,14 +172,16 @@ describe("DatePicker Component", () => {
     const button = screen.getByRole("button");
     expect(button).toHaveClass("outline-danger-main");
 
-    // The error message should be rendered
     const errorText = screen.getByText(errorMessage);
     expect(errorText).toBeInTheDocument();
     expect(errorText).toHaveClass("text-danger-main");
   });
 
+  /**
+   * @it Verifies that the disabled state takes precedence over the error state,
+   * applying disabled styles and hiding any error messages.
+   */
   it("should not show error message when disabled", () => {
-    // Business rule: Disabled state takes precedence over error state
     const errorMessage = "This field is required.";
     render(
       <DatePicker
@@ -149,16 +193,16 @@ describe("DatePicker Component", () => {
     );
 
     const button = screen.getByRole("button");
-    // Should have disabled styles, not error styles
     expect(button).toHaveClass("bg-neutral-30");
     expect(button).not.toHaveClass("outline-danger-main");
-
-    // Error message should not be rendered
     expect(screen.queryByText(errorMessage)).not.toBeInTheDocument();
   });
 
+  /**
+   * @it Verifies that clicking the component's button toggles the popover's
+   * open state by calling `setIsOpen` with the opposite value.
+   */
   it("should call setIsOpen to toggle popover on click", () => {
-    // 1. Test opening
     mockedUseDatePickerPopover.mockReturnValue({
       ...defaultMockHookValue,
       isOpen: false,
@@ -170,26 +214,26 @@ describe("DatePicker Component", () => {
     const button = screen.getByRole("button");
     fireEvent.click(button);
 
-    // It was false, so it should be called with true
     expect(mockSetIsOpen).toHaveBeenCalledWith(true);
 
-    // 2. Test closing
     mockSetIsOpen.mockClear();
     mockedUseDatePickerPopover.mockReturnValue({
       ...defaultMockHookValue,
-      isOpen: true, // Now mock that it's open
+      isOpen: true,
     });
 
     rerender(<DatePicker value={null} onChange={jest.fn()} />);
 
     fireEvent.click(button);
 
-    // It was true, so it should be called with false
     expect(mockSetIsOpen).toHaveBeenCalledWith(false);
   });
 
+  /**
+   * @it Verifies that the `popoverElement` returned from the mock hook
+   * is rendered in the document when `isOpen` is true.
+   */
   it("should render the popover element when open", () => {
-    // Mock the hook to return an open state and a mock element
     mockedUseDatePickerPopover.mockReturnValue({
       ...defaultMockHookValue,
       isOpen: true,
@@ -198,10 +242,13 @@ describe("DatePicker Component", () => {
 
     render(<DatePicker value={null} onChange={jest.fn()} />);
 
-    // The mock popover (defined in setup) should be visible
     expect(screen.getByTestId("mock-popover")).toBeInTheDocument();
   });
 
+  /**
+   * @it VerVifies that the `minDate` and `maxDate` props are correctly
+   * passed through to the `useDatePickerPopover` hook as `minDateProp` and `maxDateProp`.
+   */
   it("should pass minDate and maxDate props to the hook", () => {
     const mockOnChange = jest.fn();
     const minDate = "2025-01-01";
@@ -216,7 +263,6 @@ describe("DatePicker Component", () => {
       />
     );
 
-    // Verify that the hook was called with the min/max props
     expect(mockedUseDatePickerPopover).toHaveBeenCalledWith(
       expect.objectContaining({
         minDateProp: minDate,

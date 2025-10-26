@@ -1,4 +1,3 @@
-import React from "react";
 import { renderHook, act } from "@testing-library/react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
@@ -6,11 +5,21 @@ import {
   useDropdownPopover,
   UseDropdownPopoverProps,
   DropdownOption,
-} from "./useDropdownPopover"; // Adjust import path as needed
+} from "./useDropdownPopover";
+
+/**
+ * @file Test suite for the `useDropdownPopover` hook.
+ * @description This file contains unit tests for the `useDropdownPopover` hook,
+ * covering rendering, positioning, filtering, selection, CSS class application,
+ * and closing behavior. It mocks dependencies like `react-dom`.
+ */
 
 // --- Mocks ---
 
-// 1. Mock react-dom's createPortal
+/**
+ * Mocks `react-dom.createPortal` to render the element inline.
+ * This allows querying the popover content directly within the test DOM using `screen`.
+ */
 jest.mock("react-dom", () => ({
   ...jest.requireActual("react-dom"),
   createPortal: (element: React.ReactNode) => element,
@@ -18,18 +27,24 @@ jest.mock("react-dom", () => ({
 
 // --- Test Setup ---
 
-// Mock options for our tests
+/**
+ * A static array of mock `DropdownOption` objects used as test data.
+ */
 const mockOptions: DropdownOption[] = [
   { id: 1, label: "Apple" },
   { id: 2, label: "Banana" },
   { id: 3, label: "Mango" },
 ];
 
-// Helper to create a mock anchor ref
+/**
+ * Creates a mock React ref object pointing to a button element
+ * with a mocked `getBoundingClientRect` method for positioning tests.
+ * @returns {React.RefObject<HTMLElement>} A mock ref object.
+ */
 const createMockAnchorRef = () => {
   const anchorRef = { current: document.createElement("button") };
   jest.spyOn(anchorRef.current, "getBoundingClientRect").mockReturnValue({
-    width: 200, // Mock width
+    width: 200,
     height: 40,
     top: 50,
     left: 50,
@@ -42,14 +57,19 @@ const createMockAnchorRef = () => {
   return anchorRef as React.RefObject<HTMLElement>;
 };
 
+/**
+ * @describe Main test suite for the `useDropdownPopover` hook.
+ */
 describe("useDropdownPopover", () => {
   let mockOnSelectOption: jest.Mock;
   let mockOnClose: jest.Mock;
   let mockAnchorRef: React.RefObject<HTMLElement>;
   let baseProps: UseDropdownPopoverProps;
 
+  /**
+   * @beforeEach Resets mocks and sets up base props before each test.
+   */
   beforeEach(() => {
-    // Reset all mocks and create base props for each test
     mockOnSelectOption = jest.fn();
     mockOnClose = jest.fn();
     mockAnchorRef = createMockAnchorRef();
@@ -65,8 +85,13 @@ describe("useDropdownPopover", () => {
     };
   });
 
-  // --- Initialization and State ---
+  /**
+   * @describe Tests related to the popover's rendering and positioning.
+   */
   describe("Rendering and Positioning", () => {
+    /**
+     * @it Verifies that the hook returns a null `popoverElement` when `isOpen` is false.
+     */
     it("should render null when isOpen is false", () => {
       const { result } = renderHook((props) => useDropdownPopover(props), {
         initialProps: baseProps,
@@ -74,6 +99,10 @@ describe("useDropdownPopover", () => {
       expect(result.current.popoverElement).toBe(null);
     });
 
+    /**
+     * @it Verifies that the hook returns a non-null `popoverElement` which renders
+     * the listbox and options when `isOpen` is true.
+     */
     it("should render the popover when isOpen is true", () => {
       const { result, rerender } = renderHook(
         (props) => useDropdownPopover(props),
@@ -82,12 +111,10 @@ describe("useDropdownPopover", () => {
         }
       );
 
-      // Open the popover by re-rendering with isOpen: true
       rerender({ ...baseProps, isOpen: true });
       render(result.current.popoverElement);
 
       expect(screen.getByRole("listbox")).toBeInTheDocument();
-      // Should render all options
       expect(screen.getByRole("option", { name: "Apple" })).toBeInTheDocument();
       expect(
         screen.getByRole("option", { name: "Banana" })
@@ -95,6 +122,10 @@ describe("useDropdownPopover", () => {
       expect(screen.getByRole("option", { name: "Mango" })).toBeInTheDocument();
     });
 
+    /**
+     * @it Verifies that the rendered popover element has the correct inline styles
+     * for `top`, `left`, and `width` based on the mock `anchorRef`.
+     */
     it("should position the popover based on anchorRef", () => {
       const { result, rerender } = renderHook(
         (props) => useDropdownPopover(props),
@@ -106,25 +137,24 @@ describe("useDropdownPopover", () => {
       render(result.current.popoverElement);
 
       const popover = screen.getByRole("listbox");
-      // From mock getBoundingClientRect:
-      // top = rect.bottom (90) + 4 = 94px
-      // left = rect.left (50) = 50px
-      // width = rect.width (200) = 200px
       expect(popover.style.top).toBe("94px");
       expect(popover.style.left).toBe("50px");
       expect(popover.style.width).toBe("200px");
     });
   });
 
-  // --- Filtering and Searching ---
+  /**
+   * @describe Tests for the filtering logic based on the `searchTerm` prop.
+   */
   describe("Filtering and Searching", () => {
+    /**
+     * @it Verifies that the options list is correctly filtered based on `searchTerm`,
+     * ignoring case.
+     */
     it("should filter options based on searchTerm (case-insensitive)", () => {
-      const { result } = renderHook(
-        (props) => useDropdownPopover(props),
-        {
-          initialProps: { ...baseProps, isOpen: true, searchTerm: "apple" },
-        }
-      );
+      const { result } = renderHook((props) => useDropdownPopover(props), {
+        initialProps: { ...baseProps, isOpen: true, searchTerm: "apple" },
+      });
       render(result.current.popoverElement);
 
       expect(screen.getByRole("option", { name: "Apple" })).toBeInTheDocument();
@@ -136,13 +166,14 @@ describe("useDropdownPopover", () => {
       ).not.toBeInTheDocument();
     });
 
+    /**
+     * @it Verifies that a "no results" message is shown when the `searchTerm`
+     * does not match any options.
+     */
     it('should show "no results" message when filter finds nothing', () => {
-      const { result } = renderHook(
-        (props) => useDropdownPopover(props),
-        {
-          initialProps: { ...baseProps, isOpen: true, searchTerm: "zzzz" },
-        }
-      );
+      const { result } = renderHook((props) => useDropdownPopover(props), {
+        initialProps: { ...baseProps, isOpen: true, searchTerm: "zzzz" },
+      });
       render(result.current.popoverElement);
 
       expect(
@@ -150,28 +181,32 @@ describe("useDropdownPopover", () => {
       ).toBeInTheDocument();
     });
 
+    /**
+     * @it Verifies that a "no options" message is shown when the `options` array is empty.
+     */
     it('should show "no options" message when options array is empty', () => {
-      const { result } = renderHook(
-        (props) => useDropdownPopover(props),
-        {
-          initialProps: { ...baseProps, isOpen: true, options: [] },
-        }
-      );
+      const { result } = renderHook((props) => useDropdownPopover(props), {
+        initialProps: { ...baseProps, isOpen: true, options: [] },
+      });
       render(result.current.popoverElement);
 
       expect(screen.getByText("No options available.")).toBeInTheDocument();
     });
   });
 
-  // --- Selection and CSS Classes ---
+  /**
+   * @describe Tests related to option selection via click/keyboard and
+   * the application of CSS classes for selected state.
+   */
   describe("Selection and CSS Classes", () => {
+    /**
+     * @it Verifies that clicking an option calls the `onSelectOption` callback
+     * with the correct `DropdownOption` object.
+     */
     it("should call onSelectOption with correct option on click", () => {
-      const { result } = renderHook(
-        (props) => useDropdownPopover(props),
-        {
-          initialProps: { ...baseProps, isOpen: true },
-        }
-      );
+      const { result } = renderHook((props) => useDropdownPopover(props), {
+        initialProps: { ...baseProps, isOpen: true },
+      });
       render(result.current.popoverElement);
 
       const bananaOption = screen.getByRole("option", { name: "Banana" });
@@ -180,16 +215,16 @@ describe("useDropdownPopover", () => {
       });
 
       expect(mockOnSelectOption).toHaveBeenCalledTimes(1);
-      expect(mockOnSelectOption).toHaveBeenCalledWith(mockOptions[1]); // { id: 2, label: 'Banana' }
+      expect(mockOnSelectOption).toHaveBeenCalledWith(mockOptions[1]);
     });
 
+    /**
+     * @it Verifies that pressing the "Enter" key on an option calls `onSelectOption`.
+     */
     it('should call onSelectOption on "Enter" key press', () => {
-      const { result } = renderHook(
-        (props) => useDropdownPopover(props),
-        {
-          initialProps: { ...baseProps, isOpen: true },
-        }
-      );
+      const { result } = renderHook((props) => useDropdownPopover(props), {
+        initialProps: { ...baseProps, isOpen: true },
+      });
       render(result.current.popoverElement);
 
       const mangoOption = screen.getByRole("option", { name: "Mango" });
@@ -198,16 +233,16 @@ describe("useDropdownPopover", () => {
       });
 
       expect(mockOnSelectOption).toHaveBeenCalledTimes(1);
-      expect(mockOnSelectOption).toHaveBeenCalledWith(mockOptions[2]); // { id: 3, label: 'Mango' }
+      expect(mockOnSelectOption).toHaveBeenCalledWith(mockOptions[2]);
     });
 
+    /**
+     * @it Verifies that pressing the "Space" key on an option calls `onSelectOption`.
+     */
     it('should call onSelectOption on "Space" key press', () => {
-      const { result } = renderHook(
-        (props) => useDropdownPopover(props),
-        {
-          initialProps: { ...baseProps, isOpen: true },
-        }
-      );
+      const { result } = renderHook((props) => useDropdownPopover(props), {
+        initialProps: { ...baseProps, isOpen: true },
+      });
       render(result.current.popoverElement);
 
       const appleOption = screen.getByRole("option", { name: "Apple" });
@@ -216,58 +251,61 @@ describe("useDropdownPopover", () => {
       });
 
       expect(mockOnSelectOption).toHaveBeenCalledTimes(1);
-      expect(mockOnSelectOption).toHaveBeenCalledWith(mockOptions[0]); // { id: 1, label: 'Apple' }
+      expect(mockOnSelectOption).toHaveBeenCalledWith(mockOptions[0]);
     });
 
+    /**
+     * @it Verifies that the correct CSS classes and `aria-selected` attribute
+     * are applied to options based on the `selectedValue` prop.
+     */
     it("should apply correct selected classes based on selectedValue", () => {
-      const { result } = renderHook(
-        (props) => useDropdownPopover(props),
-        {
-          initialProps: { ...baseProps, isOpen: true, selectedValue: 2 }, // Select 'Banana'
-        }
-      );
+      const { result } = renderHook((props) => useDropdownPopover(props), {
+        initialProps: { ...baseProps, isOpen: true, selectedValue: 2 },
+      });
       render(result.current.popoverElement);
 
       const appleOption = screen.getByRole("option", { name: "Apple" });
       const bananaOption = screen.getByRole("option", { name: "Banana" });
 
-      // Check selected item (Banana)
       expect(bananaOption).toHaveClass("bg-primary-surface");
       expect(bananaOption.firstChild).toHaveClass("text-primary-main");
       expect(bananaOption).toHaveAttribute("aria-selected", "true");
 
-      // Check non-selected item (Apple)
       expect(appleOption).toHaveClass("bg-white hover:bg-neutral-20");
       expect(appleOption.firstChild).toHaveClass("text-neutral-100");
       expect(appleOption).toHaveAttribute("aria-selected", "false");
     });
   });
 
-  // --- Closing Behavior ---
+  /**
+   * @describe Tests for the different ways the popover can be closed.
+   */
   describe("Closing Behavior", () => {
+    /**
+     * @it Verifies that clicking outside the popover (and outside the anchor)
+     * calls the `onClose` callback.
+     */
     it("should call onClose when clicking outside", () => {
-      const { result } = renderHook(
-        (props) => useDropdownPopover(props),
-        {
-          initialProps: { ...baseProps, isOpen: true },
-        }
-      );
+      const { result } = renderHook((props) => useDropdownPopover(props), {
+        initialProps: { ...baseProps, isOpen: true },
+      });
       render(result.current.popoverElement);
 
       act(() => {
-        fireEvent.mouseDown(document.body); // Click outside
+        fireEvent.mouseDown(document.body);
       });
 
       expect(mockOnClose).toHaveBeenCalledTimes(1);
     });
 
+    /**
+     * @it Verifies that pressing the "Escape" key while the popover is focused
+     * calls the `onClose` callback.
+     */
     it('should call onClose on "Escape" key press', () => {
-      const { result } = renderHook(
-        (props) => useDropdownPopover(props),
-        {
-          initialProps: { ...baseProps, isOpen: true },
-        }
-      );
+      const { result } = renderHook((props) => useDropdownPopover(props), {
+        initialProps: { ...baseProps, isOpen: true },
+      });
       render(result.current.popoverElement);
 
       const popover = screen.getByRole("listbox");
@@ -278,34 +316,34 @@ describe("useDropdownPopover", () => {
       expect(mockOnClose).toHaveBeenCalledTimes(1);
     });
 
+    /**
+     * @it Verifies that clicking *inside* the popover element does not call `onClose`.
+     */
     it("should not call onClose when clicking inside the popover", () => {
-      const { result } = renderHook(
-        (props) => useDropdownPopover(props),
-        {
-          initialProps: { ...baseProps, isOpen: true },
-        }
-      );
+      const { result } = renderHook((props) => useDropdownPopover(props), {
+        initialProps: { ...baseProps, isOpen: true },
+      });
       render(result.current.popoverElement);
 
       const popover = screen.getByRole("listbox");
       act(() => {
-        fireEvent.mouseDown(popover); // Click inside
+        fireEvent.mouseDown(popover);
       });
 
       expect(mockOnClose).not.toHaveBeenCalled();
     });
 
+    /**
+     * @it Verifies that clicking the original anchor element does not call `onClose`.
+     */
     it("should not call onClose when clicking the anchor element", () => {
-      const { result } = renderHook(
-        (props) => useDropdownPopover(props),
-        {
-          initialProps: { ...baseProps, isOpen: true },
-        }
-      );
+      const { result } = renderHook((props) => useDropdownPopover(props), {
+        initialProps: { ...baseProps, isOpen: true },
+      });
       render(result.current.popoverElement);
 
       act(() => {
-        fireEvent.mouseDown(mockAnchorRef.current as HTMLElement); // Click on anchor
+        fireEvent.mouseDown(mockAnchorRef.current as HTMLElement);
       });
 
       expect(mockOnClose).not.toHaveBeenCalled();

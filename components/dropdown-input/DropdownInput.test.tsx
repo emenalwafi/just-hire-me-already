@@ -1,16 +1,28 @@
-import React from "react";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import DropdownInput from "./DropdownInput"; // Adjust import path
 import { DropdownOption } from "@/hooks/dropdown-popover/useDropdownPopover"; // Adjust import path
 
+/**
+ * @file Test suite for the DropdownInput (Combobox) component.
+ * @description This file contains unit tests for the DropdownInput, verifying its
+ * rendering, states, user interactions (typing, focusing, selecting),
+ * and integration with the mocked `useDropdownPopover` hook.
+ */
+
 // --- Mocks ---
 
-// 1. Mock the custom hook `useDropdownPopover`
-// We need to capture the callbacks to simulate hook interactions
 let mockOnSelectOption: (option: DropdownOption) => void;
 let mockOnClose: () => void;
 
+/**
+ * Mocks the `useDropdownPopover` hook.
+ * This mock captures the `onSelectOption` and `onClose` callbacks provided
+ * by the DropdownInput component, allowing tests to simulate a user
+ * selecting an option or the popover closing.
+ * It also provides a mock `popoverElement` with the ID the component
+ * uses for its blur-handling logic.
+ */
 jest.mock("../../hooks/dropdown-popover/useDropdownPopover", () => ({
   useDropdownPopover: jest.fn(
     ({
@@ -20,22 +32,22 @@ jest.mock("../../hooks/dropdown-popover/useDropdownPopover", () => ({
       onSelectOption: (option: DropdownOption) => void;
       onClose: () => void;
     }) => {
-      // Capture the callbacks
       mockOnSelectOption = onSelectOption;
       mockOnClose = onClose;
       return {
-        // Render a mock popover with the ID the component checks for
         popoverElement: (
           <div data-testid="mock-popover" id="dropdown-listbox-id" />
         ),
       };
     }
   ),
-  // Also mock the type export, though it's often not needed for jest
   DropdownOption: jest.fn(),
 }));
 
-// 2. Mock the icon library
+/**
+ * Mocks the `@iconscout/react-unicons` library.
+ * Replaces the `UilAngleDown` icon with a simple `<span>` for testing.
+ */
 jest.mock("@iconscout/react-unicons", () => ({
   UilAngleDown: (props: { className: string }) => (
     <span data-testid="icon-angle-down" className={props.className} />
@@ -45,13 +57,19 @@ jest.mock("@iconscout/react-unicons", () => ({
 // --- Test Setup ---
 jest.useFakeTimers();
 
+/**
+ * A mock array of `DropdownOption` objects used as test data.
+ */
 const mockOptions: DropdownOption[] = [
   { id: 1, label: "Apple" },
   { id: 2, label: "Banana" },
   { id: 3, label: "Mango" },
 ];
 
-// Helper: Get the component's main elements
+/**
+ * Helper function to get the primary elements of the DropdownInput component.
+ * @returns {object} An object containing the `input`, `wrapper`, and `caretButton` elements.
+ */
 const getElements = () => {
   const input = screen.getByRole("combobox") as HTMLInputElement;
   const wrapper = input.parentElement as HTMLElement;
@@ -61,12 +79,18 @@ const getElements = () => {
   return { input, wrapper, caretButton };
 };
 
+/**
+ * @describe Main test suite for the DropdownInput component.
+ */
 describe("DropdownInput", () => {
   let mockOnChange: jest.Mock;
 
+  /**
+   * @beforeEach Resets the `mockOnChange` function and re-initializes
+   * the `useDropdownPopover` mock implementation for each test.
+   */
   beforeEach(() => {
     mockOnChange = jest.fn();
-    // Reset the hook mock's implementation for each test
     (
       jest.requireMock("../../hooks/dropdown-popover/useDropdownPopover")
         .useDropdownPopover as jest.Mock
@@ -89,6 +113,9 @@ describe("DropdownInput", () => {
     );
   });
 
+  /**
+   * @afterEach Clears all Jest fake timers after each test.
+   */
   afterEach(() => {
     act(() => {
       jest.clearAllTimers();
@@ -96,7 +123,13 @@ describe("DropdownInput", () => {
   });
 
   // --- Rendering and Props ---
+  /**
+   * @describe Tests related to basic rendering and prop handling.
+   */
   describe("Rendering and Props", () => {
+    /**
+     * @it Verifies that the label and required asterisk are rendered correctly.
+     */
     it("should render label and required asterisk", () => {
       render(
         <DropdownInput
@@ -112,6 +145,9 @@ describe("DropdownInput", () => {
       expect(screen.getByText("Fruit").nextSibling?.textContent).toBe("*");
     });
 
+    /**
+     * @it Verifies that the required asterisk is not rendered when the input is not required.
+     */
     it("should not render required asterisk if input not required", () => {
       render(
         <DropdownInput
@@ -125,6 +161,9 @@ describe("DropdownInput", () => {
       expect(screen.getByText("Fruit").nextSibling?.textContent).not.toBe("*");
     });
 
+    /**
+     * @it Verifies that the placeholder text is displayed when the `value` prop is null.
+     */
     it("should render placeholder when value is null", () => {
       render(
         <DropdownInput
@@ -137,6 +176,9 @@ describe("DropdownInput", () => {
       expect(screen.getByPlaceholderText("Select a fruit")).toBeInTheDocument();
     });
 
+    /**
+     * @it Verifies that the input displays the correct label from the `value` prop.
+     */
     it("should display value label when value is provided", () => {
       render(
         <DropdownInput
@@ -149,6 +191,9 @@ describe("DropdownInput", () => {
       expect(input.value).toBe("Apple");
     });
 
+    /**
+     * @it Verifies that a string error message is rendered when provided.
+     */
     it("should render an error message string", () => {
       render(
         <DropdownInput
@@ -161,6 +206,9 @@ describe("DropdownInput", () => {
       expect(screen.getByText("This is required")).toBeInTheDocument();
     });
 
+    /**
+     * @it Verifies that a hidden input is rendered with the correct name and selected value.
+     */
     it("should render hidden input with correct value when name prop is provided", () => {
       render(
         <DropdownInput
@@ -178,6 +226,9 @@ describe("DropdownInput", () => {
       expect(hiddenInput.value).toBe("2");
     });
 
+    /**
+     * @it Verifies that the hidden input has an empty value when the `value` prop is null.
+     */
     it("should render hidden input with empty value when value is null", () => {
       render(
         <DropdownInput
@@ -196,7 +247,13 @@ describe("DropdownInput", () => {
   });
 
   // --- Visual States (Classes) ---
+  /**
+   * @describe Tests for CSS classes applied in different component states.
+   */
   describe("Visual States (Classes)", () => {
+    /**
+     * @it Verifies that disabled-related classes are applied when `disabled` prop is true.
+     */
     it("should apply disabled styles and classes", () => {
       render(
         <DropdownInput
@@ -218,6 +275,9 @@ describe("DropdownInput", () => {
       );
     });
 
+    /**
+     * @it Verifies that error-related classes are applied when `error` prop is true.
+     */
     it("should apply error styles and classes", () => {
       render(
         <DropdownInput
@@ -231,6 +291,9 @@ describe("DropdownInput", () => {
       expect(wrapper).toHaveClass("bg-white outline-danger-main");
     });
 
+    /**
+     * @it Verifies that focused/open classes are applied on input focus.
+     */
     it("should apply focused/open styles and classes on input focus", () => {
       render(
         <DropdownInput
@@ -241,24 +304,23 @@ describe("DropdownInput", () => {
       );
       const { input, wrapper } = getElements();
 
-      // Default state
       expect(wrapper).toHaveClass("bg-neutral-10 outline-neutral-40");
       expect(screen.getByTestId("icon-angle-down")).not.toHaveClass(
         "rotate-180"
       );
 
-      // Focus
       act(() => {
         fireEvent.focus(input);
       });
 
-      // Check classes
       expect(wrapper).toHaveClass("bg-white outline-primary-main");
       expect(wrapper).toHaveClass("caret-primary-main");
-      // Check icon rotation for open state
       expect(screen.getByTestId("icon-angle-down")).toHaveClass("rotate-180");
     });
 
+    /**
+     * @it Verifies the correct text color for placeholder vs. selected value.
+     */
     it("should apply correct text color for placeholder vs. value", () => {
       const { rerender } = render(
         <DropdownInput
@@ -267,10 +329,8 @@ describe("DropdownInput", () => {
           options={mockOptions}
         />
       );
-      // Placeholder state
       expect(getElements().input).toHaveClass("text-neutral-60");
 
-      // Value state
       rerender(
         <DropdownInput
           value={mockOptions[0]}
@@ -283,7 +343,13 @@ describe("DropdownInput", () => {
   });
 
   // --- User Interactions ---
+  /**
+   * @describe Tests for user-driven events and component interactions.
+   */
   describe("User Interactions", () => {
+    /**
+     * @it Verifies that clicking the component wrapper focuses the input and opens the popover.
+     */
     it("should open popover and focus input on wrapper click", () => {
       render(
         <DropdownInput
@@ -299,7 +365,6 @@ describe("DropdownInput", () => {
       });
 
       expect(input).toHaveFocus();
-      // Check that the hook was called with isOpen: true
       expect(
         jest.requireMock("../../hooks/dropdown-popover/useDropdownPopover")
           .useDropdownPopover
@@ -310,6 +375,9 @@ describe("DropdownInput", () => {
       );
     });
 
+    /**
+     * @it Verifies that typing in the input updates the hook's `searchTerm` prop.
+     */
     it("should filter list when typing in input", () => {
       render(
         <DropdownInput
@@ -328,7 +396,6 @@ describe("DropdownInput", () => {
       });
 
       expect(input.value).toBe("Ap");
-      // Check that the hook was called with the correct search term
       expect(
         jest.requireMock("../../hooks/dropdown-popover/useDropdownPopover")
           .useDropdownPopover
@@ -340,6 +407,9 @@ describe("DropdownInput", () => {
       );
     });
 
+    /**
+     * @it Verifies that clicking the caret button toggles the popover open and closed.
+     */
     it("should toggle popover on caret click", () => {
       const { rerender } = render(
         <DropdownInput
@@ -350,12 +420,10 @@ describe("DropdownInput", () => {
       );
       const { caretButton, input } = getElements();
 
-      // --- 1. Open ---
       act(() => {
         fireEvent.click(caretButton);
       });
 
-      // Check hook state
       expect(
         jest.requireMock("../../hooks/dropdown-popover/useDropdownPopover")
           .useDropdownPopover
@@ -366,8 +434,6 @@ describe("DropdownInput", () => {
       );
       expect(input).toHaveFocus();
 
-      // --- 2. Close ---
-      // Simulate state update from parent
       rerender(
         <DropdownInput
           value={null}
@@ -376,13 +442,12 @@ describe("DropdownInput", () => {
         />
       );
       act(() => {
-        fireEvent.focus(input); // Need to focus first to get into open state
+        fireEvent.focus(input);
       });
       act(() => {
         fireEvent.click(caretButton);
       });
 
-      // Check hook state
       expect(
         jest.requireMock("../../hooks/dropdown-popover/useDropdownPopover")
           .useDropdownPopover
@@ -394,6 +459,10 @@ describe("DropdownInput", () => {
       expect(input).not.toHaveFocus();
     });
 
+    /**
+     * @it Verifies the full selection flow: simulating a hook selection,
+     * checking `onChange`, and verifying the input's final state.
+     */
     it("should select option, update value, and close when simulating onSelectOption", () => {
       const { rerender } = render(
         <DropdownInput
@@ -405,37 +474,30 @@ describe("DropdownInput", () => {
 
       const { input } = getElements();
 
-      // 1. Open the popover
       act(() => {
         fireEvent.focus(input);
       });
 
-      // 2. Simulate the hook calling onSelectOption
       act(() => {
         mockOnSelectOption(mockOptions[1]); // Select 'Banana'
       });
       act(() => {
-        jest.advanceTimersByTime(200); // Advance past 100ms timer
+        jest.advanceTimersByTime(200);
       });
 
-      // 3. Check props
       expect(mockOnChange).toHaveBeenCalledWith(mockOptions[1]);
 
-      // 4. Check state updates (via hook props)
       expect(
         jest.requireMock("../../hooks/dropdown-popover/useDropdownPopover")
           .useDropdownPopover
       ).toHaveBeenLastCalledWith(
         expect.objectContaining({
           isOpen: false,
-          selectedValue: undefined, // FIX: The `value` prop is still null at this point
-          searchTerm: "Banana", // inputValue was updated
+          selectedValue: undefined,
+          searchTerm: "Banana",
         })
       );
 
-      // 5. Check input value and focus
-      // The display value is now driven by the `value` prop, not state
-      // We need to rerender with the new prop
       rerender(
         <DropdownInput
           value={mockOptions[1]} // 'Banana'
@@ -447,6 +509,10 @@ describe("DropdownInput", () => {
       expect(input).not.toHaveFocus();
     });
 
+    /**
+     * @it Verifies that the input value is cleared on blur if the user typed
+     * but did not make a valid selection.
+     */
     it("should clear input on blur if user types but does not select", () => {
       render(
         <DropdownInput
@@ -457,7 +523,6 @@ describe("DropdownInput", () => {
       );
       const { input } = getElements();
 
-      // 1. Focus and type
       act(() => {
         fireEvent.focus(input);
       });
@@ -466,25 +531,25 @@ describe("DropdownInput", () => {
       });
       expect(input.value).toBe("B");
 
-      // 2. Simulate click outside (which calls onClose)
       act(() => {
         mockOnClose();
       });
 
-      // 3. Blur the input
       act(() => {
         fireEvent.blur(input);
       });
 
-      // 4. Advance past the blur timer
       act(() => {
         jest.advanceTimersByTime(200);
       });
 
-      // 5. Input value should be cleared
       expect(input.value).toBe("");
     });
 
+    /**
+     * @it Verifies that the input value reverts to the selected prop's label
+     * on blur, rather than being cleared.
+     */
     it("should NOT clear input on blur if a value is selected", () => {
       render(
         <DropdownInput
@@ -496,7 +561,6 @@ describe("DropdownInput", () => {
       const { input } = getElements();
       expect(input.value).toBe("Apple");
 
-      // 1. Focus and blur
       act(() => {
         fireEvent.focus(input);
       });
@@ -504,12 +568,10 @@ describe("DropdownInput", () => {
         fireEvent.blur(input);
       });
 
-      // 2. Advance past the blur timer
       act(() => {
         jest.advanceTimersByTime(200);
       });
 
-      // 3. Input value should revert to the prop's label, not be cleared
       expect(input.value).toBe("Apple");
     });
   });

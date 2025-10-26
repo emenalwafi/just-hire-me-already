@@ -6,27 +6,43 @@ import {
   useCountryPhonePopover,
   UseCountryPhonePopoverProps,
   Country,
-} from "./useCountryPhonePopover"; // Adjust import path as needed
+} from "./useCountryPhonePopover";
+
+/**
+ * @file Test suite for the `useCountryPhonePopover` hook.
+ * @description This file contains unit tests for the `useCountryPhonePopover` hook.
+ * It mocks dependencies (`react-dom`, icons, flags) and uses a custom
+ * `setupHook` helper to test the hook's state, interactions, filtering,
+ * and element rendering simultaneously.
+ */
 
 // --- Mocks ---
 
-// 1. Mock react-dom's createPortal
+/**
+ * Mocks `react-dom.createPortal` to return the element directly.
+ * This renders the "portal" inline within the test DOM,
+ * making it queryable with `screen`.
+ */
 jest.mock("react-dom", () => ({
   ...jest.requireActual("react-dom"),
   createPortal: (element: React.ReactNode) => element,
 }));
 
-// 2. Mock the icon library
+/**
+ * Mocks the `@iconscout/react-unicons` library.
+ * Replaces the `UilSearch` icon with a simple `<span>` for testing.
+ */
 jest.mock("@iconscout/react-unicons", () => ({
   UilSearch: () => <span data-testid="icon-search" />,
 }));
 
-// 3. Mock the entire flag icon library
-// The hook imports `* as Flags` and accesses `Flags[ISO]`.
-// We need to mock this module structure.
+/**
+ * Mocks the `country-flag-icons/react/3x2` module.
+ * The hook imports `* as Flags`, so we mock the module structure
+ * and provide specific named exports for the flags used in our test data.
+ */
 jest.mock("country-flag-icons/react/3x2", () => ({
-  __esModule: true, // This is important for module mocks with named exports
-  // Mock the specific flags we'll use in our test data
+  __esModule: true,
   ID: (props: { title: string }) => (
     <span data-testid="flag-ID" title={props.title} />
   ),
@@ -40,17 +56,31 @@ jest.mock("country-flag-icons/react/3x2", () => ({
 
 // --- Test Setup ---
 
-// Mock country data. Using the `countries` prop is *much* easier
-// than mocking `libphonenumber-js` and `Intl.DisplayNames`.
+/**
+ * A static array of mock `Country` data used to bypass
+ * `libphonenumber-js` and `Intl.DisplayNames` calls within the hook.
+ */
 const mockCountries: Country[] = [
   { name: "Indonesia", code: "+62", iso: "ID" },
   { name: "United States", code: "+1", iso: "US" },
   { name: "Japan", code: "+81", iso: "JP" },
 ];
 
-// Helper setup function
+/**
+ * A custom setup function to initialize the hook and its rendered element.
+ *
+ * This helper does two things:
+ * 1. Renders the `useCountryPhonePopover` hook using `renderHook`.
+ * 2. Renders the `popoverElement` returned by the hook using `render`.
+ *
+ * It wraps the hook's `rerender` function to *also* rerender the
+ * `popoverElement`, keeping the hook's state and its UI in sync.
+ *
+ * @param {Partial<UseCountryPhonePopoverProps>} props - Optional props to override the defaults.
+ * @returns {object} An object containing the hook's `result`, `rerender` function,
+ * the `mockOnSelectCountry` function, the `anchorRef`, and the element's `rerenderElement` function.
+ */
 const setupHook = (props: Partial<UseCountryPhonePopoverProps> = {}) => {
-  // 1. Create a mock anchor ref
   const anchorRef = { current: document.createElement("button") };
   jest.spyOn(anchorRef.current, "getBoundingClientRect").mockReturnValue({
     width: 100,
@@ -64,33 +94,27 @@ const setupHook = (props: Partial<UseCountryPhonePopoverProps> = {}) => {
     toJSON: () => ({}),
   } as DOMRect);
 
-  // 2. Create a mock onSelectCountry
   const mockOnSelectCountry = jest.fn();
 
-  // 3. Render the hook
   const hookResult = renderHook(
     (p: UseCountryPhonePopoverProps) => useCountryPhonePopover(p),
     {
       initialProps: {
         anchorRef: anchorRef as React.RefObject<HTMLElement>,
         onSelectCountry: mockOnSelectCountry,
-        countries: mockCountries, // Use our mock data by default
+        countries: mockCountries,
         ...props,
       },
     }
   );
 
-  // 4. Render the returned popoverElement and get the element's rerender function
   const { rerender: rerenderElement } = render(
     hookResult.result.current.popoverElement
   );
 
-  // 5. Wrap the hook's rerender function to also rerender the element
   const originalRerender = hookResult.rerender;
   hookResult.rerender = (newProps) => {
-    // Rerender the hook first
     originalRerender(newProps);
-    // THEN, rerender the element with the hook's new popoverElement value
     rerenderElement(hookResult.result.current.popoverElement);
   };
 
@@ -102,9 +126,18 @@ const setupHook = (props: Partial<UseCountryPhonePopoverProps> = {}) => {
   };
 };
 
+/**
+ * @describe Main test suite for the `useCountryPhonePopover` hook.
+ */
 describe("useCountryPhonePopover", () => {
-  // --- Initialization and State ---
+  /**
+   * @describe Tests for the hook's initial state and basic open/close logic.
+   */
   describe("Initialization and Popover State", () => {
+    /**
+     * @it Verifies that the hook initializes with `isOpen` false,
+     * no `popoverElement`, and an empty `searchTerm`.
+     */
     it("should initialize closed with no search term", () => {
       const { result } = setupHook();
       expect(result.current.isOpen).toBe(false);
@@ -112,6 +145,10 @@ describe("useCountryPhonePopover", () => {
       expect(result.current.searchTerm).toBe("");
     });
 
+    /**
+     * @it Verifies that the popover element renders immediately
+     * if `initialIsOpen` prop is true.
+     */
     it("should render open if initialIsOpen is true", () => {
       setupHook({ initialIsOpen: true });
       expect(
@@ -122,6 +159,10 @@ describe("useCountryPhonePopover", () => {
       ).toBeInTheDocument();
     });
 
+    /**
+     * @it Verifies that calling `setIsOpen(true)` updates the `isOpen` state
+     * and renders the `popoverElement`.
+     */
     it("should open the popover when setIsOpen(true) is called", () => {
       const { result, rerender, anchorRef, mockOnSelectCountry } = setupHook();
       expect(result.current.popoverElement).toBe(null);
@@ -129,8 +170,6 @@ describe("useCountryPhonePopover", () => {
       act(() => {
         result.current.setIsOpen(true);
       });
-      // Rerender to get the new popoverElement
-      // This calls our *wrapped* rerender, which updates both hook and element
       rerender({
         anchorRef: anchorRef as React.RefObject<HTMLElement>,
         onSelectCountry: mockOnSelectCountry,
@@ -147,6 +186,10 @@ describe("useCountryPhonePopover", () => {
       ).toBeInTheDocument();
     });
 
+    /**
+     * @it Verifies that the popover closes and resets the search term
+     * when a mousedown event occurs outside the component.
+     */
     it("should close the popover when clicking outside", () => {
       const { result } = setupHook({ initialIsOpen: true });
       expect(
@@ -158,9 +201,12 @@ describe("useCountryPhonePopover", () => {
       });
 
       expect(result.current.isOpen).toBe(false);
-      expect(result.current.searchTerm).toBe(""); // Should reset search
+      expect(result.current.searchTerm).toBe("");
     });
 
+    /**
+     * @it Verifies that the popover remains open when clicking inside it.
+     */
     it("should not close when clicking inside the popover", () => {
       const { result } = setupHook({ initialIsOpen: true });
       const dialog = screen.getByRole("dialog", {
@@ -174,6 +220,10 @@ describe("useCountryPhonePopover", () => {
       expect(result.current.isOpen).toBe(true);
     });
 
+    /**
+     * @it Verifies that pressing the Escape key closes the popover
+     * and resets the search term.
+     */
     it("should close and reset search when Escape key is pressed", () => {
       const { result } = setupHook({ initialIsOpen: true });
       const dialog = screen.getByRole("dialog", {
@@ -195,7 +245,9 @@ describe("useCountryPhonePopover", () => {
     });
   });
 
-  // --- Filtering and Searching ---
+  /**
+   * @describe Tests for the filtering logic based on the search term.
+   */
   describe("Filtering and Searching", () => {
     let hookResult: RenderHookResult<
       ReturnType<typeof useCountryPhonePopover>,
@@ -204,8 +256,11 @@ describe("useCountryPhonePopover", () => {
     let rerenderElement: (ui: React.ReactElement | null) => void;
     let mockOnSelectCountry: jest.Mock;
 
+    /**
+     * @beforeEach Sets up the hook and opens the popover before each
+     * test in this suite.
+     */
     beforeEach(() => {
-      // Open the popover before each test in this block
       const {
         result,
         rerender,
@@ -214,7 +269,6 @@ describe("useCountryPhonePopover", () => {
         rerenderElement: elRerender,
       } = setupHook();
 
-      // Store references for tests
       hookResult = result;
       rerenderElement = elRerender;
       mockOnSelectCountry = selectMock;
@@ -222,7 +276,6 @@ describe("useCountryPhonePopover", () => {
       act(() => {
         result.current.setIsOpen(true);
       });
-      // This calls our wrapped rerender, syncing hook and element
       rerender({
         anchorRef: anchorRef as React.RefObject<HTMLElement>,
         onSelectCountry: mockOnSelectCountry,
@@ -230,6 +283,9 @@ describe("useCountryPhonePopover", () => {
       });
     });
 
+    /**
+     * @it Verifies that the list is correctly filtered by country name.
+     */
     it('should filter by country name (e.g., "Japan")', () => {
       const searchInput = screen.getByPlaceholderText("Search country or code");
       act(() => {
@@ -247,6 +303,9 @@ describe("useCountryPhonePopover", () => {
       ).not.toBeInTheDocument();
     });
 
+    /**
+     * @it Verifies that the list is correctly filtered by country code with a '+'.
+     */
     it('should filter by country code with "+" (e.g., "+62")', () => {
       const searchInput = screen.getByPlaceholderText("Search country or code");
       act(() => {
@@ -263,6 +322,9 @@ describe("useCountryPhonePopover", () => {
       ).not.toBeInTheDocument();
     });
 
+    /**
+     * @it Verifies that the list is correctly filtered by country code without a '+'.
+     */
     it('should filter by country code without "+" (e.g., "81")', () => {
       const searchInput = screen.getByPlaceholderText("Search country or code");
       act(() => {
@@ -277,6 +339,9 @@ describe("useCountryPhonePopover", () => {
       ).not.toBeInTheDocument();
     });
 
+    /**
+     * @it Verifies that the list is correctly filtered by country ISO code.
+     */
     it('should filter by ISO code (e.g., "US")', () => {
       const searchInput = screen.getByPlaceholderText("Search country or code");
       act(() => {
@@ -293,6 +358,9 @@ describe("useCountryPhonePopover", () => {
       ).not.toBeInTheDocument();
     });
 
+    /**
+     * @it Verifies that the search filtering is case-insensitive.
+     */
     it("should be case-insensitive", () => {
       const searchInput = screen.getByPlaceholderText("Search country or code");
       act(() => {
@@ -306,6 +374,9 @@ describe("useCountryPhonePopover", () => {
       ).toBeInTheDocument();
     });
 
+    /**
+     * @it Verifies that a "not found" message is displayed when no results match the search.
+     */
     it('should show a "not found" message for no results', () => {
       const searchInput = screen.getByPlaceholderText("Search country or code");
       act(() => {
@@ -318,13 +389,18 @@ describe("useCountryPhonePopover", () => {
         screen.queryByRole("button", { name: /Indonesia/ })
       ).not.toBeInTheDocument();
       expect(screen.getByText("“zzzz”")).toBeInTheDocument();
-      // This text is hardcoded in your component
       expect(screen.getByText("tidak ditemukan")).toBeInTheDocument();
     });
   });
 
-  // --- Selection and Prop Handling ---
+  /**
+   * @describe Tests for country selection logic and prop handling (`selectedCountryIso`, `disabledCountryIsos`).
+   */
   describe("Selection and Props", () => {
+    /**
+     * @it Verifies that clicking a country button triggers `onSelectCountry`,
+     * closes the popover, and resets the search term.
+     */
     it("should select a country, call onSelectCountry, and close", () => {
       const { result, mockOnSelectCountry } = setupHook({
         initialIsOpen: true,
@@ -338,17 +414,16 @@ describe("useCountryPhonePopover", () => {
         fireEvent.click(indonesiaButton);
       });
 
-      // 1. Should call the callback with the correct country object
       expect(mockOnSelectCountry).toHaveBeenCalledTimes(1);
       expect(mockOnSelectCountry).toHaveBeenCalledWith(mockCountries[0]);
-
-      // 2. Should close the popover
       expect(result.current.isOpen).toBe(false);
-
-      // 3. Should reset the search term (though it was empty)
       expect(result.current.searchTerm).toBe("");
     });
 
+    /**
+     * @it Verifies that the correct 'selected' classes and ARIA attributes
+     * are applied based on the `selectedCountryIso` prop.
+     */
     it("should apply correct active and default classes based on selectedCountryIso", () => {
       setupHook({ initialIsOpen: true, selectedCountryIso: "US" });
 
@@ -359,13 +434,11 @@ describe("useCountryPhonePopover", () => {
       const idName = screen.getByText("Indonesia");
       const idCode = screen.getByText("+62");
 
-      // Check active (selected) state for US
       expect(usButton).toHaveClass("bg-primary-surface");
       expect(usButton).toHaveAttribute("aria-pressed", "true");
       expect(usName).toHaveClass("text-primary-main");
       expect(usCode).toHaveClass("text-primary-main");
 
-      // Check default (inactive) state for Indonesia
       expect(idButton).not.toHaveClass("bg-primary-surface");
       expect(idButton).toHaveAttribute("aria-pressed", "false");
       expect(idButton).toHaveClass("bg-neutral-10 hover:bg-neutral-20");
@@ -373,6 +446,10 @@ describe("useCountryPhonePopover", () => {
       expect(idCode).toHaveClass("text-neutral-100");
     });
 
+    /**
+     * @it Verifies that disabled classes and attributes are applied
+     * based on the `disabledCountryIsos` prop.
+     */
     it("should apply correct disabled classes based on disabledCountryIsos", () => {
       setupHook({ initialIsOpen: true, disabledCountryIsos: ["JP"] });
 
@@ -381,18 +458,20 @@ describe("useCountryPhonePopover", () => {
       const japanCode = screen.getByText("+81");
       const usButton = screen.getByRole("button", { name: /United States/ });
 
-      // Check disabled state for Japan
       expect(japanButton).toBeDisabled();
       expect(japanButton).toHaveAttribute("aria-disabled", "true");
       expect(japanButton).toHaveClass("bg-neutral-10 cursor-not-allowed");
       expect(japanName).toHaveClass("text-neutral-60");
       expect(japanCode).toHaveClass("text-neutral-60");
 
-      // Check default (enabled) state for US
       expect(usButton).not.toBeDisabled();
       expect(usButton).toHaveClass("bg-neutral-10 hover:bg-neutral-20");
     });
 
+    /**
+     * @it Verifies that clicking a disabled country does not trigger
+     * `onSelectCountry` and does not close the popover.
+     */
     it("should not select a disabled country or close popover", () => {
       const { result, mockOnSelectCountry } = setupHook({
         initialIsOpen: true,
@@ -405,17 +484,17 @@ describe("useCountryPhonePopover", () => {
         fireEvent.click(japanButton);
       });
 
-      // 1. Should NOT call the callback
       expect(mockOnSelectCountry).not.toHaveBeenCalled();
-
-      // 2. Should remain open
       expect(result.current.isOpen).toBe(true);
     });
 
+    /**
+     * @it Verifies that the mock flag components are rendered correctly
+     * with the appropriate `title` prop.
+     */
     it("should render flags correctly", () => {
       setupHook({ initialIsOpen: true });
 
-      // Check if our mock flags are rendered with the correct titles
       expect(screen.getByTestId("flag-ID")).toHaveAttribute(
         "title",
         "Indonesia"
