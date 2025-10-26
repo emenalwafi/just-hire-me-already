@@ -1,36 +1,40 @@
 import React, { useState, InputHTMLAttributes } from "react";
-// Import eye icons for password toggle
 import { UilCheckCircle, UilEye, UilEyeSlash } from "@iconscout/react-unicons";
 
-// Extend standard Input attributes
+/**
+ * Props for the `TextInput` component.
+ * Extends standard HTML input attributes while omitting and redefining
+ * `onChange`, `value`, and `type` for controlled component behavior.
+ */
 interface TextInputProps
   extends Omit<
     InputHTMLAttributes<HTMLInputElement>,
     "onChange" | "value" | "type"
   > {
-  // Omit type as well, handle internally
-  /** The current value of the input */
+  /** The current value of the input. */
   value: string | null;
-  /** Callback function when the input value changes */
+  /** Callback function fired when the input value changes. */
   onChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  /** Optional label displayed above the input */
+  /** Optional label displayed above the input. */
   label?: string;
-  /** Indicates if the input is required (adds *) */
+  /** Indicates if the input is required (adds a visual indicator). */
   required?: boolean;
-  /** Error state. Boolean shows red border, string shows border + message */
+  /** Sets the error state. A boolean shows a red border; a string also shows an error message. */
   error?: boolean | string;
-  /** Success message to display below (e.g., for valid URL/Email) */
+  /** Optional success message to display below the input. */
   successMessage?: string;
-  /** Functional type of the input */
+  /** The functional type of the input, which determines behavior (e.g., password toggle). */
   type?: "text" | "email" | "url" | "password" | "number" | "search";
 }
 
 /**
- * @component TextInput
- * @description A basic text input component with various states (rest, focused, error, disabled)
- * and optional label, required indicator, helper/success messages, and password visibility toggle.
+ * A styled text input component.
  *
- * @param {TextInputProps} props - The props for the TextInput component.
+ * This component provides a fully-featured text input with support for labels,
+ * required fields, error and success states, and a visibility toggle for password fields.
+ * It wraps a standard HTML `<input>` and applies styling based on its state.
+ *
+ * @param {TextInputProps} props - The component props.
  * @returns {React.ReactElement} The rendered TextInput component.
  */
 const TextInput: React.FC<TextInputProps> = ({
@@ -42,56 +46,47 @@ const TextInput: React.FC<TextInputProps> = ({
   disabled = false,
   error = false,
   successMessage,
-  type = "text", // Original functional type
+  type = "text",
   className,
   ...rest
 }) => {
   const [isFocused, setIsFocused] = useState(false);
-  // State to manage password visibility
   const [showPassword, setShowPassword] = useState(false);
 
-  // Determine the actual input type attribute based on state
   const inputType = type === "password" && showPassword ? "text" : type;
 
-  // --- Styling Logic ---
   let containerClasses =
     "self-stretch h-10 px-4 py-2 rounded-lg outline outline-2 outline-offset-[-2px] inline-flex items-center gap-2 overflow-hidden transition-colors w-full";
   let inputClasses =
     "flex-1 w-full bg-transparent border-none outline-none focus:outline-none p-0 text-base placeholder:text-neutral-60";
   let labelClasses = "text-neutral-90 text-sm";
   let caretColorClass = "";
-  let iconColorClass = "text-neutral-100"; // Color for trailing icons
+  let iconColorClass = "text-neutral-100";
 
   if (disabled) {
     containerClasses += " bg-neutral-30 outline-neutral-40 cursor-not-allowed";
     inputClasses += " text-neutral-60 cursor-not-allowed";
     labelClasses += " text-neutral-60";
-    iconColorClass = "text-neutral-60"; // Dim icon when disabled
+    iconColorClass = "text-neutral-60";
   } else if (error) {
     containerClasses += " bg-white outline-danger-main";
     inputClasses += " text-neutral-90";
     caretColorClass = "caret-danger-main";
-    // iconColorClass remains neutral-100
   } else if (isFocused) {
     containerClasses += " bg-white outline-primary-main";
     inputClasses += " text-neutral-90";
     caretColorClass = "caret-primary-main";
-    // iconColorClass remains neutral-100
   } else {
-    // Rest state
     containerClasses +=
       " bg-neutral-10 outline-neutral-40 hover:outline-neutral-70";
     inputClasses += value ? " text-neutral-90" : " text-neutral-60";
-    // iconColorClass remains neutral-100
   }
 
-  // Determine if there is a message to display
   const hasErrorMessage = typeof error === "string";
   const hasSuccessMessage = !error && successMessage;
   const showMessageContainer =
     !disabled && (hasErrorMessage || hasSuccessMessage);
 
-  // Toggle password visibility handler
   const togglePasswordVisibility = () => {
     if (!disabled) {
       setShowPassword((prev) => !prev);
@@ -114,9 +109,7 @@ const TextInput: React.FC<TextInputProps> = ({
 
       {/* Input Container */}
       <div className={containerClasses}>
-        {/* Add optional leading icon slot here if needed in future */}
         <input
-          // Use the dynamic inputType
           type={inputType}
           value={value || ""}
           onChange={onChange}
@@ -150,7 +143,6 @@ const TextInput: React.FC<TextInputProps> = ({
             )}
           </button>
         )}
-        {/* Add other potential trailing icons here */}
       </div>
 
       {/* Helper/Error/Success Message - Conditionally Rendered */}
