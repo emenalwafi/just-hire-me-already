@@ -113,21 +113,21 @@ const DropdownInput: React.FC<DropdownInputProps> = ({
 
   if (disabled) {
     wrapperClasses += " bg-neutral-30 outline-neutral-40 cursor-not-allowed";
-    textClasses = " text-neutral-60";
+    textClasses += " text-neutral-60";
     iconColorClass = "text-neutral-60";
   } else if (error) {
     wrapperClasses += " bg-white outline-danger-main";
-    textClasses = value ? " text-neutral-90" : " text-neutral-60";
+    textClasses += value ? " text-neutral-90" : " text-neutral-60";
     iconColorClass = "text-neutral-100";
   } else if (isFocused || isOpen) {
     wrapperClasses += " bg-white outline-primary-main";
-    textClasses = " text-neutral-90";
+    textClasses += " text-neutral-90";
     iconColorClass = "text-neutral-100";
     caretColorClass = "caret-primary-main";
   } else {
     wrapperClasses +=
       " bg-neutral-10 outline-neutral-40 hover:outline-neutral-70";
-    textClasses = value ? " text-neutral-90" : " text-neutral-60";
+    textClasses += value ? " text-neutral-90" : " text-neutral-60";
     iconColorClass = "text-neutral-100";
   }
 
