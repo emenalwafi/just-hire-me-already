@@ -3,31 +3,42 @@ import { UilAngleDown } from "@iconscout/react-unicons";
 import {
   useDropdownPopover,
   DropdownOption,
-} from "@/hooks/dropdown-popover/useDropdownPopover"; // Assuming hook is in hooks folder
+} from "@/hooks/dropdown-popover/useDropdownPopover";
 
+/**
+ * Props for the `DropdownInput` component.
+ */
 interface DropdownInputProps {
-  /** The currently selected option object, or null */
+  /** The currently selected option object, or null if no selection. */
   value: DropdownOption | null;
-  /** Callback function when an option is selected */
+  /** Callback function fired when an option is selected from the dropdown. */
   onChange: (option: DropdownOption | null) => void;
-  /** Array of options to display in the popover */
+  /** An array of all available options to display in the popover. */
   options: DropdownOption[];
-  /** Optional label for the input */
+  /** Optional label displayed above the input. */
   label?: string;
-  /** Indicates if the input is required */
+  /** Whether the input is required (adds a visual indicator). */
   required?: boolean;
-  /** Placeholder text when no option is selected */
+  /** Placeholder text to display when `value` is null. */
   placeholder?: string;
-  /** Whether the input is disabled */
+  /** Whether the input is disabled. */
   disabled?: boolean;
-  /** Error state. Can be boolean or a string message */
+  /** Sets the error state. A boolean shows a red border; a string also shows an error message. */
   error?: boolean | string;
-  /** Optional width override for the popover (Tailwind class) */
-  popoverWidth?: string; // e.g., 'w-[572px]' or 'w-full'
-  /** Optional: Name attribute for the hidden input */
+  /** Optional `name` attribute to include a hidden input for form submissions. */
   name?: string;
 }
 
+/**
+ * A searchable dropdown input component (combobox).
+ *
+ * This component functions as a text input that, when focused or typed in,
+ * displays a popover of filterable options. It allows users to search for
+ * and select an option, or clear the selection.
+ *
+ * @param {DropdownInputProps} props - The component props.
+ * @returns {React.ReactElement} The rendered DropdownInput component.
+ */
 const DropdownInput: React.FC<DropdownInputProps> = ({
   value,
   onChange,
@@ -37,38 +48,35 @@ const DropdownInput: React.FC<DropdownInputProps> = ({
   placeholder = "Select an option",
   disabled = false,
   error = false,
-  name, // Add name prop
+  name,
 }) => {
-  const triggerRef = useRef<HTMLDivElement>(null); // Ref for the container div
-  const inputRef = useRef<HTMLInputElement>(null); // Ref for the actual input
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const [isFocused, setIsFocused] = useState(false); // Track focus state for styling
-  const [inputValue, setInputValue] = useState(value ? value.label : ""); // State for the input's text value
-  const isSelectionInProgress = useRef(false); // Flag to prevent blur handler from reverting during selection
+  const [isFocused, setIsFocused] = useState(false);
+  const [inputValue, setInputValue] = useState(value ? value.label : "");
+  const isSelectionInProgress = useRef(false);
 
-  // Sync input value if the external value prop changes
   const displayValue = isFocused ? inputValue : value ? value.label : "";
 
-  // Use the custom hook for the popover
   const { popoverElement } = useDropdownPopover({
-    anchorRef: triggerRef, // Pass the ref of the container div
+    anchorRef: triggerRef,
     options: options,
     selectedValue: value?.id,
-    searchTerm: inputValue, // Pass the input's current value as searchTerm
+    searchTerm: inputValue,
     onSelectOption: (option) => {
-      isSelectionInProgress.current = true; // Set flag before updating state
-      onChange(option); // Update state via prop
-      setInputValue(option.label); // Update the input display value
-      setIsOpen(false); // Close popover
-      setIsFocused(false); // Remove focus style on selection
-      inputRef.current?.blur(); // Blur the input
+      isSelectionInProgress.current = true;
+      onChange(option);
+      setInputValue(option.label);
+      setIsOpen(false);
+      setIsFocused(false);
+      inputRef.current?.blur();
       setTimeout(() => {
         isSelectionInProgress.current = false;
-      }, 100); // Reset flag shortly after
+      }, 100);
     },
     isOpen: isOpen,
     onClose: () => {
-      // Only close if not in the middle of a selection click
       if (!isSelectionInProgress.current) {
         setIsOpen(false);
       }
@@ -77,62 +85,55 @@ const DropdownInput: React.FC<DropdownInputProps> = ({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
-    setIsOpen(true); // Open the popover when user types.
+    setIsOpen(true);
   };
 
   const handleInputFocus = () => {
     if (!disabled) {
       setIsFocused(true);
       setInputValue(value ? value.label : "");
-      setIsOpen(true); // Open popover on focus
+      setIsOpen(true);
     }
   };
 
   const handleBlur = () => {
-    // Use a small timeout to allow click events on the popover to register
     setTimeout(() => {
       if (!isOpen && !isSelectionInProgress.current) {
-        // Check isOpen and the flag
         setIsFocused(false);
-        // Revert input value if it doesn't match the selected value's label
         setInputValue("");
       }
-    }, 150); // Adjust timeout as needed
+    }, 150);
   };
 
-  // --- Styling Logic ---
   let wrapperClasses =
-    "self-stretch h-10 px-4 py-2 rounded-lg outline outline-2 outline-offset-[-2px] inline-flex justify-between items-center gap-2 overflow-hidden transition-colors w-full"; // Removed cursor-pointer
-  let textClasses = "text-base"; // Input handles its own text color
+    "self-stretch h-10 px-4 py-2 rounded-lg outline outline-2 outline-offset-[-2px] inline-flex justify-between items-center gap-2 overflow-hidden transition-colors w-full";
+  let textClasses = "text-base";
   let iconColorClass = "text-neutral-100";
   let caretColorClass = "";
 
   if (disabled) {
     wrapperClasses += " bg-neutral-30 outline-neutral-40 cursor-not-allowed";
-    textClasses = " text-neutral-60"; // Apply to input placeholder/value
+    textClasses = " text-neutral-60";
     iconColorClass = "text-neutral-60";
   } else if (error) {
     wrapperClasses += " bg-white outline-danger-main";
-    textClasses = value ? " text-neutral-90" : " text-neutral-60"; // This might need refinement based on inputValue
+    textClasses = value ? " text-neutral-90" : " text-neutral-60";
     iconColorClass = "text-neutral-100";
   } else if (isFocused || isOpen) {
     wrapperClasses += " bg-white outline-primary-main";
-    textClasses = " text-neutral-90"; // Assume typing means text should be dark
+    textClasses = " text-neutral-90";
     iconColorClass = "text-neutral-100";
-    caretColorClass = "caret-primary-main"; // Set caret color for input
+    caretColorClass = "caret-primary-main";
   } else {
-    // Rest state
     wrapperClasses +=
       " bg-neutral-10 outline-neutral-40 hover:outline-neutral-70";
-    textClasses = value ? " text-neutral-90" : " text-neutral-60"; // Placeholder vs Filled text color
+    textClasses = value ? " text-neutral-90" : " text-neutral-60";
     iconColorClass = "text-neutral-100";
   }
 
-  // Determine text color class specifically for the input based on value and disabled state
   const inputTextColorClass = disabled
     ? "text-neutral-60"
-    : // Use dark text if focused/open OR if there's a selected value externally
-    isFocused || isOpen || value
+    : isFocused || isOpen || value
     ? "text-neutral-90"
     : "text-neutral-60";
 
@@ -146,7 +147,6 @@ const DropdownInput: React.FC<DropdownInputProps> = ({
           {required && <span className="text-danger-main text-sm">*</span>}
         </div>
       )}
-      {/* Container div now primarily for layout and focus/blur capture */}
       <div
         ref={triggerRef}
         className={`${wrapperClasses} ${caretColorClass}`}
@@ -158,10 +158,9 @@ const DropdownInput: React.FC<DropdownInputProps> = ({
         }}
         tabIndex={-1}
         onBlurCapture={(e) => {
-          // Check if the related target (where focus is going) is still inside this component OR the popover
           const popoverElementCheck = document.getElementById(
             "dropdown-listbox-id"
-          ); // Use a stable ID if possible
+          );
           if (
             !e.currentTarget.contains(e.relatedTarget as Node) &&
             !(
@@ -169,7 +168,6 @@ const DropdownInput: React.FC<DropdownInputProps> = ({
               popoverElementCheck.contains(e.relatedTarget as Node)
             )
           ) {
-            // Use blur handler logic (with timeout)
             handleBlur();
           }
         }}
@@ -177,45 +175,39 @@ const DropdownInput: React.FC<DropdownInputProps> = ({
         <input
           ref={inputRef}
           type="text"
-          // Removed readOnly
-          value={displayValue} // Use the derived displayValue
-          onChange={handleInputChange} // Update local state on change
-          onFocus={handleInputFocus} // Handle focus event
-          // onBlur={handleBlur} // Use capture on parent instead
+          value={displayValue}
+          onChange={handleInputChange}
+          onFocus={handleInputFocus}
           placeholder={placeholder}
           disabled={disabled}
-          // Apply text color, remove default input styles
           className={`flex-1 w-full bg-transparent border-none outline-none p-0 caret-primary-main ${textClasses} ${inputTextColorClass} placeholder:text-neutral-60 focus:outline-none ${
             disabled ? "cursor-not-allowed" : ""
           }`}
-          aria-label={label || placeholder} // Repeat label for input accessibility
-          role="combobox" // Input is the combobox
+          aria-label={label || placeholder}
+          role="combobox"
           aria-haspopup="listbox"
           aria-expanded={isOpen}
-          aria-controls={isOpen ? "dropdown-listbox-id" : undefined} // Link to popover ID
-          autoComplete="off" // Prevent browser autocomplete interfering
+          aria-controls={isOpen ? "dropdown-listbox-id" : undefined}
+          autoComplete="off"
         />
-        {/* Make icon clickable to toggle dropdown */}
         <button
           type="button"
           onClick={(e) => {
-            // Stop propagation to prevent the div's onClick from re-focusing
             e.stopPropagation();
             if (disabled) return;
             if (isOpen) {
               setIsOpen(false);
-              inputRef.current?.blur(); // Explicitly blur
+              inputRef.current?.blur();
             } else {
-              // Call state update function *and* native focus
               handleInputFocus();
-              inputRef.current?.focus(); // This will trigger handleInputFocus
+              inputRef.current?.focus();
             }
           }}
           disabled={disabled}
           className={`focus:outline-none ${
             disabled ? "cursor-not-allowed" : "cursor-pointer"
           }`}
-          tabIndex={-1} // Prevent tabbing to the icon separately
+          tabIndex={-1}
           aria-label={isOpen ? "Close dropdown" : "Open dropdown"}
         >
           <UilAngleDown
@@ -226,7 +218,6 @@ const DropdownInput: React.FC<DropdownInputProps> = ({
           />
         </button>
 
-        {/* Hidden input to potentially hold the value for form submission */}
         {name && <input type="hidden" name={name} value={value?.id || ""} />}
       </div>
 
