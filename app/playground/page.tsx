@@ -11,6 +11,7 @@ import {
 import DropdownInput from "@/components/dropdown-input/DropdownInput";
 import { DropdownOption } from "@/hooks/dropdown-popover/useDropdownPopover";
 import TextInput from "@/components/text-input/TextInput";
+import RadioInput from "@/components/radio-input/RadioInput";
 
 // Sample options for Dropdown examples
 const domicileOptions: DropdownOption[] = [
@@ -29,6 +30,12 @@ const domicileOptions: DropdownOption[] = [
   { id: "jawa_barat_4", label: "Kota Bogor - Jawa Barat" },
   { id: "jakarta_1", label: "Jakarta Pusat - DKI Jakarta" },
   { id: "jakarta_2", label: "Jakarta Selatan - DKI Jakarta" },
+];
+
+const pronounOptions = [
+  { value: "female", label: "She/her (Female)" },
+  { value: "male", label: "He/him (Male)" },
+  { value: "other", label: "They/them (Other)" },
 ];
 
 // --- Helper function to extract national number ---
@@ -87,6 +94,12 @@ export default function Home() {
   const [textValue4, setTextValue4] = useState<string | null>("Disabled Value");
   const [emailValue, setEmailValue] = useState<string | null>(""); // For email/success example
   const [passwordValue, setPasswordValue] = useState<string | null>(""); // For email/success example
+
+  const [selectedPronoun, setSelectedPronoun] = useState<string | null>("male");
+  const [selectedOption, setSelectedOption] = useState<string | null>(
+    "option2"
+  );
+  const [errorRadioValue, setErrorRadioValue] = useState<string | null>(null);
 
   // --- Helper logic to display national number (repeated for each example) ---
   // We call the helper function directly. The React Compiler will memoize
@@ -555,6 +568,84 @@ export default function Home() {
             />
             <p className="text-xs text-neutral-60 mt-1">Value: ******</p>
           </div>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-xl font-bold mb-4">Radio Input</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-12 items-start">
+          {/* Example 1: Basic */}
+          <div>
+            <RadioInput
+              label="Pronoun (Gender)"
+              required
+              options={pronounOptions}
+              selectedValue={selectedPronoun}
+              onChange={setSelectedPronoun}
+              name="pronoun-group-1" // Unique name for the group
+            />
+            <p className="text-xs text-neutral-60 mt-2">
+              Selected: {selectedPronoun || "None"}
+            </p>
+          </div>
+
+          {/* Example 2: Pre-selected & Disabled */}
+          <div>
+            <RadioInput
+              label="Delivery Option (Disabled)"
+              options={[
+                { value: "standard", label: "Standard Shipping" },
+                { value: "express", label: "Express Shipping" },
+              ]}
+              selectedValue={"standard"} // Pre-select standard
+              onChange={() => {}} // No-op
+              name="delivery-group-disabled"
+              disabled={true} // Disable the whole group
+            />
+            <p className="text-xs text-neutral-60 mt-2">
+              Selected: standard (Disabled)
+            </p>
+          </div>
+
+          {/* Example 3: Error State */}
+          <div>
+            <RadioInput
+              label="Confirmation (Error)"
+              required
+              options={[
+                { value: "yes", label: "Yes" },
+                { value: "no", label: "No" },
+              ]}
+              selectedValue={selectedOption}
+              onChange={setSelectedOption}
+              name="confirm-group"
+              // Example error: show if required and nothing selected
+              error={!selectedOption ? "Please select an option" : false}
+            />
+            <p className="text-xs text-neutral-60 mt-2">
+              Selected: {selectedOption || "None"}
+            </p>
+          </div>
+        </div>
+
+        {/* Example 4: Static Error State */}
+        <div>
+          <RadioInput
+            label="Agreement (Static Error)"
+            required
+            options={[
+              { value: "agree", label: "I Agree" },
+              { value: "disagree", label: "I Disagree" },
+            ]}
+            selectedValue={errorRadioValue} // Use separate state
+            onChange={setErrorRadioValue}
+            name="agreement-group-error"
+            // Always show error message
+            error={"You must agree to continue"}
+          />
+          <p className="text-xs text-neutral-60 mt-2">
+            Selected: {errorRadioValue || "None"}
+          </p>
         </div>
       </section>
     </div>
