@@ -125,7 +125,7 @@ export function useDatePickerPopover({
   /** Memoized `Date` object for the selected `value`, bounded by min/max dates. */
   const selectedDate = useMemo(() => {
     if (!value) return null;
-    const parsed = parseISO(value);
+    const parsed = startOfDay(parseISO(value));
     if (isValid(parsed)) {
       // Ensure the selected date isn't before minDate or after maxDate
       const bounded = minDate && isBefore(parsed, minDate) ? minDate : parsed;
@@ -139,7 +139,7 @@ export function useDatePickerPopover({
    * Prefers the `selectedDate` if available, otherwise defaults to today.
    */
   const getBoundedInitialDate = useCallback(() => {
-    const initial = selectedDate || new Date();
+    const initial = selectedDate || startOfDay(new Date());
     const afterMin = minDate ? max([initial, minDate]) : initial;
     return maxDate ? min([afterMin, maxDate]) : afterMin;
   }, [selectedDate, minDate, maxDate]);
@@ -665,7 +665,8 @@ export function useDatePickerPopover({
                         " bg-neutral-20 hover:bg-neutral-30 outline outline-1 outline-neutral-40 cursor-pointer";
                     } else {
                       dayTextClasses += " text-neutral-90";
-                      dayButtonClasses += " bg-neutral-10 hover:bg-neutral-40 cursor-pointer";
+                      dayButtonClasses +=
+                        " bg-neutral-10 hover:bg-neutral-40 cursor-pointer";
                     }
 
                     return (
@@ -786,7 +787,8 @@ export function useDatePickerPopover({
                 } else {
                   // Default selectable year
                   yearTextClasses += " text-neutral-90";
-                  yearButtonClasses += " bg-neutral-10 hover:bg-neutral-20 cursor-pointer";
+                  yearButtonClasses +=
+                    " bg-neutral-10 hover:bg-neutral-20 cursor-pointer";
                 }
 
                 return (

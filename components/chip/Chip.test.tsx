@@ -11,7 +11,7 @@ describe("Chip Component", () => {
     const button = screen.getByRole("button", { name: /Default Chip/i });
 
     // Find the text element's container
-    const textContainer = screen.getByText("Default Chip").parentElement;
+    const textContainer = screen.getByText("Default Chip");
 
     // Check for correct classes
     expect(button).toHaveClass(
@@ -31,7 +31,7 @@ describe("Chip Component", () => {
     render(<Chip selected>Selected Chip</Chip>);
 
     const button = screen.getByRole("button", { name: /Selected Chip/i });
-    const textContainer = screen.getByText("Selected Chip").parentElement;
+    const textContainer = screen.getByText("Selected Chip");
 
     // Check for correct "selected" classes
     expect(button).toHaveClass("bg-neutral-10", "outline-primary-main");
@@ -50,7 +50,7 @@ describe("Chip Component", () => {
     render(<Chip disabled>Disabled Chip</Chip>);
 
     const button = screen.getByRole("button", { name: /Disabled Chip/i });
-    const textContainer = screen.getByText("Disabled Chip").parentElement;
+    const textContainer = screen.getByText("Disabled Chip");
 
     // Check for correct "disabled" classes
     expect(button).toHaveClass(

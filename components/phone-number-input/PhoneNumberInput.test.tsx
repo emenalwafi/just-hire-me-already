@@ -10,8 +10,10 @@ import { Country } from "@/hooks/country-phone-popover/useCountryPhonePopover"; 
 let mockOnSelectCountry: (country: Country) => void;
 const mockSetCountryPopoverOpen = jest.fn();
 
-jest.mock("@/hooks/country-phone-popover/useCountryPhonePopover", () => ({
-  ...jest.requireActual("@/hooks/country-phone-popover/useCountryPhonePopover"),
+jest.mock("../../hooks/country-phone-popover/useCountryPhonePopover", () => ({
+  ...jest.requireActual(
+    "../../hooks/country-phone-popover/useCountryPhonePopover"
+  ),
   useCountryPhonePopover: jest.fn(
     ({ onSelectCountry }: { onSelectCountry: (country: Country) => void }) => {
       // Capture the callback to simulate selection
@@ -52,7 +54,9 @@ jest.mock("libphonenumber-js/max", () => ({
 
 // 3. Mock the icon library
 jest.mock("@iconscout/react-unicons", () => ({
-  UilAngleDown: () => <span data-testid="icon-angle-down" />,
+  UilAngleDown: (props: { className: string }) => (
+    <span data-testid="icon-angle-down" className={props.className} />
+  ),
 }));
 
 // 4. Mock the entire flag icon library
@@ -73,9 +77,9 @@ const mockIndonesia: Country = { name: "Indonesia", code: "+62", iso: "ID" };
 const mockUS: Country = { name: "United States", code: "+1", iso: "US" };
 
 // We need to mock the `getAllCountryData` *used by the component*
-jest.mock("@/hooks/country-phone-popover/useCountryPhonePopover", () => {
+jest.mock("../../hooks/country-phone-popover/useCountryPhonePopover", () => {
   const originalModule = jest.requireActual(
-    "@/hooks/country-phone-popover/useCountryPhonePopover"
+    "../../hooks/country-phone-popover/useCountryPhonePopover"
   );
   return {
     ...originalModule,

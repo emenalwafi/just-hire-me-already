@@ -1,26 +1,22 @@
 import React from "react";
 import { renderHook, act } from "@testing-library/react";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import {
   useDatePickerPopover,
   UseDatePickerPopoverProps,
 } from "./useDatePickerPopover"; // Adjust import path
-import { format } from "date-fns";
+import { format, parseISO, startOfDay } from "date-fns";
 
 // --- Mocks ---
 
 // 1. Mock react-dom's createPortal
-// This is a common pattern. We make createPortal render its children directly
-// into the test's virtual DOM, instead of to document.body.
-// This makes testing the popover's content *much* easier.
 jest.mock("react-dom", () => ({
-  ...jest.requireActual("react-dom"), // Keep all other exports
+  ...jest.requireActual("react-dom"),
   createPortal: (element: React.ReactNode) => element,
 }));
 
 // 2. Mock the icon library
-// We don't need to test the icons, just that they're called.
 jest.mock("@iconscout/react-unicons", () => ({
   UilAngleLeft: () => <span data-testid="icon-angle-left" />,
   UilAngleRight: () => <span data-testid="icon-angle-right" />,
@@ -31,9 +27,8 @@ jest.mock("@iconscout/react-unicons", () => ({
 // --- Test Setup ---
 
 // Set a consistent "today" for all tests
-// We use Sunday, Oct 26, 2025
 const TODAY_ISO = "2025-10-26";
-const TODAY_DATE = new Date(TODAY_ISO);
+const TODAY_DATE = startOfDay(parseISO(TODAY_ISO));
 
 beforeAll(() => {
   jest.useFakeTimers();
@@ -77,15 +72,34 @@ const setupHook = (props: Partial<UseDatePickerPopoverProps> = {}) => {
     }
   );
 
-  // 4. Render the returned popoverElement (if it exists)
-  // This is how we can interact with the UI the hook generates
-  hookResult.result.current.popoverElement &&
-    render(hookResult.result.current.popoverElement);
+  // 4. Render the returned popoverElement (which is initially null)
+  // This gives us the `rerender` function for the UI
+  const { rerender: renderRerender } = render(
+    hookResult.result.current.popoverElement
+  );
+
+  // 5. Create a custom rerender that syncs the hook and the UI
+  const customRerender = (
+    newProps: Partial<UseDatePickerPopoverProps> = {}
+  ) => {
+    // Rerender the hook first
+    hookResult.rerender({
+      value: null,
+      onChange: mockOnChange,
+      triggerRef: triggerRef as React.RefObject<HTMLButtonElement>,
+      ...props,
+      ...newProps,
+    });
+    // Rerender the UI with the *new* popoverElement
+    renderRerender(hookResult.result.current.popoverElement);
+  };
 
   return {
-    ...hookResult,
+    result: hookResult.result,
     mockOnChange,
     triggerRef,
+    rerender: customRerender, // This rerenders hook AND UI
+    hookRerender: hookResult.rerender, // Original hook-only rerender
   };
 };
 
@@ -103,7 +117,7 @@ describe("useDatePickerPopover", () => {
 
     it("should initialize with the provided value", () => {
       const { result } = setupHook({ value: "2024-05-15" });
-      const expectedDate = new Date("2024-05-15T00:00:00.000Z");
+      const expectedDate = startOfDay(parseISO("2024-05-15"));
       expect(result.current.selectedDate).toEqual(expectedDate);
       expect(result.current.currentDate).toEqual(expectedDate);
     });
@@ -113,7 +127,7 @@ describe("useDatePickerPopover", () => {
         value: "2024-01-01",
         minDateProp: "2024-02-01",
       });
-      const expectedDate = new Date("2024-02-01T00:00:00.000Z");
+      const expectedDate = startOfDay(parseISO("2024-02-01"));
       // selectedDate and currentDate are bounded to minDate
       expect(result.current.selectedDate).toEqual(expectedDate);
       expect(result.current.currentDate).toEqual(expectedDate);
@@ -124,7 +138,7 @@ describe("useDatePickerPopover", () => {
         value: "2024-12-01",
         maxDateProp: "2024-11-01",
       });
-      const expectedDate = new Date("2024-11-01T00:00:00.000Z");
+      const expectedDate = startOfDay(parseISO("2024-11-01"));
       expect(result.current.selectedDate).toEqual(expectedDate);
       expect(result.current.currentDate).toEqual(expectedDate);
     });
@@ -133,23 +147,19 @@ describe("useDatePickerPopover", () => {
   // --- Popover and State Tests ---
   describe("Popover State and UI", () => {
     it("should open the popover and render it", () => {
-      const { result, rerender, triggerRef } = setupHook();
+      const { result, rerender } = setupHook();
       expect(result.current.popoverElement).toBe(null);
 
       // Open the popover
       act(() => {
         result.current.setIsOpen(true);
       });
-      rerender({
-        value: null,
-        onChange: jest.fn(),
-        triggerRef: triggerRef as React.RefObject<HTMLButtonElement>,
-      }); // Re-render the hook to get the new popoverElement
+      rerender();
 
       expect(result.current.isOpen).toBe(true);
       expect(result.current.popoverElement).not.toBe(null);
 
-      // Verify the popover content is rendered (thanks to our portal mock)
+      // Verify the popover content is rendered
       expect(
         screen.getByRole("dialog", { name: "Date Picker" })
       ).toBeInTheDocument();
@@ -165,17 +175,13 @@ describe("useDatePickerPopover", () => {
     });
 
     it("should close the popover when clicking outside", () => {
-      const { result, rerender, triggerRef } = setupHook();
+      const { result, rerender } = setupHook();
 
       // Open it
       act(() => {
         result.current.setIsOpen(true);
       });
-      rerender({
-        value: null,
-        onChange: jest.fn(),
-        triggerRef: triggerRef as React.RefObject<HTMLButtonElement>,
-      });
+      rerender();
       expect(result.current.isOpen).toBe(true);
       expect(screen.getByRole("dialog")).toBeInTheDocument();
 
@@ -188,15 +194,11 @@ describe("useDatePickerPopover", () => {
     });
 
     it("should NOT close when clicking inside the popover", () => {
-      const { result, rerender, triggerRef } = setupHook();
+      const { result, rerender } = setupHook();
       act(() => {
         result.current.setIsOpen(true);
       });
-      rerender({
-        value: null,
-        onChange: jest.fn(),
-        triggerRef: triggerRef as React.RefObject<HTMLButtonElement>,
-      });
+      rerender();
       const dialog = screen.getByRole("dialog");
 
       // Click inside the dialog
@@ -208,19 +210,15 @@ describe("useDatePickerPopover", () => {
     });
 
     it('should correctly style "today" when not selected', () => {
-      const { result, rerender, triggerRef } = setupHook(); // value is null
+      const { result, rerender } = setupHook(); // value is null
       act(() => {
         result.current.setIsOpen(true);
       });
-      rerender({
-        value: null,
-        onChange: jest.fn(),
-        triggerRef: triggerRef as React.RefObject<HTMLButtonElement>,
-      });
+      rerender();
 
       // Today is Oct 26, 2025
       const todayButton = screen.getByRole("button", {
-        name: "Select October 26, 2025",
+        name: "Select October 26th, 2025",
       });
 
       // Should have "today" classes
@@ -242,17 +240,16 @@ describe("useDatePickerPopover", () => {
       act(() => {
         hookResult.result.current.setIsOpen(true);
       });
+      // This will rerender the hook AND the UI
       hookResult.rerender({
-        value: null,
         onChange: hookResult.mockOnChange,
-        triggerRef: hookResult.triggerRef as React.RefObject<HTMLButtonElement>,
       });
     });
 
     it("should select a day and close the popover", () => {
       // We are in Oct 2025. Let's click "28".
       const dayButton = screen.getByRole("button", {
-        name: "Select October 28, 2025",
+        name: "Select October 28th, 2025",
       });
 
       act(() => {
@@ -272,11 +269,7 @@ describe("useDatePickerPopover", () => {
       act(() => {
         fireEvent.click(monthTitleButton);
       });
-      hookResult.rerender({
-        value: null,
-        onChange: hookResult.mockOnChange,
-        triggerRef: hookResult.triggerRef as React.RefObject<HTMLButtonElement>,
-      });
+      hookResult.rerender({ onChange: hookResult.mockOnChange });
 
       // 2. Now in Month view
       expect(
@@ -288,11 +281,7 @@ describe("useDatePickerPopover", () => {
       act(() => {
         fireEvent.click(yearTitleButton);
       });
-      hookResult.rerender({
-        value: null,
-        onChange: hookResult.mockOnChange,
-        triggerRef: hookResult.triggerRef as React.RefObject<HTMLButtonElement>,
-      });
+      hookResult.rerender({ onChange: hookResult.mockOnChange });
 
       // 3. Now in Year view (Decade 2020-2029)
       expect(
@@ -304,15 +293,11 @@ describe("useDatePickerPopover", () => {
       act(() => {
         fireEvent.click(decadeTitleButton);
       });
-      hookResult.rerender({
-        value: null,
-        onChange: hookResult.mockOnChange,
-        triggerRef: hookResult.triggerRef as React.RefObject<HTMLButtonElement>,
-      });
+      hookResult.rerender({ onChange: hookResult.mockOnChange });
 
       // 4. Now in Decade view
       expect(
-        screen.getByRole("button", { name: "Select decade 2010-2019" })
+        screen.getByRole("button", { name: "Select decade 2010 - 2019" })
       ).toBeInTheDocument();
     });
 
@@ -323,11 +308,7 @@ describe("useDatePickerPopover", () => {
           screen.getByRole("button", { name: "Select month for year 2025" })
         );
       });
-      hookResult.rerender({
-        value: null,
-        onChange: hookResult.mockOnChange,
-        triggerRef: hookResult.triggerRef as React.RefObject<HTMLButtonElement>,
-      });
+      hookResult.rerender({ onChange: hookResult.mockOnChange });
 
       // Click "Jan"
       act(() => {
@@ -335,11 +316,7 @@ describe("useDatePickerPopover", () => {
           screen.getByRole("button", { name: "Select Jan 2025" })
         );
       });
-      hookResult.rerender({
-        value: null,
-        onChange: hookResult.mockOnChange,
-        triggerRef: hookResult.triggerRef as React.RefObject<HTMLButtonElement>,
-      });
+      hookResult.rerender({ onChange: hookResult.mockOnChange });
 
       // Should be back in day view, but for Jan 2025
       expect(hookResult.mockOnChange).not.toHaveBeenCalled();
@@ -347,7 +324,7 @@ describe("useDatePickerPopover", () => {
         screen.getByRole("button", { name: "Select month for year 2025" })
       ).toHaveTextContent("Jan");
       expect(
-        screen.getByRole("button", { name: "Select January 1, 2025" })
+        screen.getByRole("button", { name: "Select January 1st, 2025" })
       ).toBeInTheDocument();
       expect(hookResult.result.current.currentDate.getMonth()).toBe(0); // 0 = Jan
     });
@@ -366,11 +343,7 @@ describe("useDatePickerPopover", () => {
           })
         );
       });
-      hookResult.rerender({
-        value: null,
-        onChange: hookResult.mockOnChange,
-        triggerRef: hookResult.triggerRef as React.RefObject<HTMLButtonElement>,
-      });
+      hookResult.rerender({ onChange: hookResult.mockOnChange });
 
       // Click "2023"
       act(() => {
@@ -378,11 +351,7 @@ describe("useDatePickerPopover", () => {
           screen.getByRole("button", { name: "Select year 2023" })
         );
       });
-      hookResult.rerender({
-        value: null,
-        onChange: hookResult.mockOnChange,
-        triggerRef: hookResult.triggerRef as React.RefObject<HTMLButtonElement>,
-      });
+      hookResult.rerender({ onChange: hookResult.mockOnChange });
 
       // Should be in month view for 2023
       expect(hookResult.mockOnChange).not.toHaveBeenCalled();
@@ -404,6 +373,7 @@ describe("useDatePickerPopover", () => {
           screen.getByRole("button", { name: "Select month for year 2025" })
         );
       });
+      hookResult.rerender({ onChange: hookResult.mockOnChange });
       act(() => {
         fireEvent.click(
           screen.getByRole("button", {
@@ -411,6 +381,7 @@ describe("useDatePickerPopover", () => {
           })
         );
       });
+      hookResult.rerender({ onChange: hookResult.mockOnChange });
       act(() => {
         fireEvent.click(
           screen.getByRole("button", {
@@ -418,23 +389,15 @@ describe("useDatePickerPopover", () => {
           })
         );
       });
-      hookResult.rerender({
-        value: null,
-        onChange: hookResult.mockOnChange,
-        triggerRef: hookResult.triggerRef as React.RefObject<HTMLButtonElement>,
-      });
+      hookResult.rerender({ onChange: hookResult.mockOnChange });
 
       // Click "2010-2019"
       act(() => {
         fireEvent.click(
-          screen.getByRole("button", { name: "Select decade 2010-2019" })
+          screen.getByRole("button", { name: "Select decade 2010 - 2019" })
         );
       });
-      hookResult.rerender({
-        value: null,
-        onChange: hookResult.mockOnChange,
-        triggerRef: hookResult.triggerRef as React.RefObject<HTMLButtonElement>,
-      });
+      hookResult.rerender({ onChange: hookResult.mockOnChange });
 
       // Should be in year view for 2010-2019
       expect(hookResult.mockOnChange).not.toHaveBeenCalled();
@@ -455,17 +418,14 @@ describe("useDatePickerPopover", () => {
   describe("Min/Max Date Constraints", () => {
     it("should disable navigation buttons based on minDate", () => {
       // View is Oct 2025. Set minDate to Oct 15, 2025
-      const { rerender, result, triggerRef } = setupHook({
+      const { rerender, result } = setupHook({
         minDateProp: "2025-10-15",
       });
       act(() => {
         result.current.setIsOpen(true);
       });
       rerender({
-        value: null,
         minDateProp: "2025-10-15",
-        onChange: jest.fn(),
-        triggerRef: triggerRef as React.RefObject<HTMLButtonElement>,
       });
 
       // "Previous month" should be disabled
@@ -488,17 +448,14 @@ describe("useDatePickerPopover", () => {
 
     it("should disable navigation buttons based on maxDate", () => {
       // View is Oct 2025. Set maxDate to Oct 15, 2025
-      const { rerender, result, triggerRef } = setupHook({
+      const { rerender, result } = setupHook({
         maxDateProp: "2025-10-15",
       });
       act(() => {
         result.current.setIsOpen(true);
       });
       rerender({
-        value: null,
         maxDateProp: "2025-10-15",
-        onChange: jest.fn(),
-        triggerRef: triggerRef as React.RefObject<HTMLButtonElement>,
       });
 
       // "Next month" should be disabled
@@ -516,75 +473,67 @@ describe("useDatePickerPopover", () => {
     });
 
     it("should disable individual days before minDate", () => {
-      const { rerender, result, triggerRef } = setupHook({
+      const { rerender, result } = setupHook({
         minDateProp: "2025-10-15",
       });
       act(() => {
         result.current.setIsOpen(true);
       });
       rerender({
-        value: null,
         minDateProp: "2025-10-15",
-        onChange: jest.fn(),
-        triggerRef: triggerRef as React.RefObject<HTMLButtonElement>,
       });
 
       // Day 14 should be disabled
       const day14 = screen.getByRole("button", {
-        name: "Date October 14, 2025 (not selectable)",
+        name: "Date October 14th, 2025 (not selectable)",
       });
       expect(day14).toBeDisabled();
 
       // Day 15 should be enabled
       const day15 = screen.getByRole("button", {
-        name: "Select October 15, 2025",
+        name: "Select October 15th, 2025",
       });
       expect(day15).not.toBeDisabled();
     });
 
     it("should disable individual days after maxDate", () => {
-      const { rerender, result, triggerRef } = setupHook({
+      const { rerender, result } = setupHook({
         maxDateProp: "2025-10-30",
       });
       act(() => {
         result.current.setIsOpen(true);
       });
       rerender({
-        value: null,
         maxDateProp: "2025-10-30",
-        onChange: jest.fn(),
-        triggerRef: triggerRef as React.RefObject<HTMLButtonElement>,
       });
 
       // Day 30 should be enabled
       const day30 = screen.getByRole("button", {
-        name: "Select October 30, 2025",
+        name: "Select October 30th, 2025",
       });
       expect(day30).not.toBeDisabled();
 
       // Day 31 should be disabled
       const day31 = screen.getByRole("button", {
-        name: "Date October 31, 2025 (not selectable)",
+        name: "Date October 31st, 2025 (not selectable)",
       });
       expect(day31).toBeDisabled();
     });
 
     it("should not call onChange when clicking a disabled day", () => {
-      const { rerender, result, mockOnChange, triggerRef } = setupHook({
+      const { rerender, result, mockOnChange } = setupHook({
         minDateProp: "2025-10-15",
       });
       act(() => {
         result.current.setIsOpen(true);
       });
       rerender({
-        value: null,
         minDateProp: "2025-10-15",
         onChange: mockOnChange,
-        triggerRef: triggerRef as React.RefObject<HTMLButtonElement>,
       });
 
       const day14 = screen.getByRole("button", {
-        name: "Date October 14, 2025 (not selectable)",
+        name: "Date October 14th, 2025 (not selectable)",
       });
 
       act(() => {
@@ -596,17 +545,14 @@ describe("useDatePickerPopover", () => {
     });
 
     it("should disable individual months before minDate", () => {
-      const { rerender, result, triggerRef } = setupHook({
+      const { rerender, result } = setupHook({
         minDateProp: "2025-10-15",
       });
       act(() => {
         result.current.setIsOpen(true);
       });
       rerender({
-        value: null,
         minDateProp: "2025-10-15",
-        onChange: jest.fn(),
-        triggerRef: triggerRef as React.RefObject<HTMLButtonElement>,
       });
 
       // Go to month view
@@ -616,10 +562,7 @@ describe("useDatePickerPopover", () => {
         );
       });
       rerender({
-        value: null,
         minDateProp: "2025-10-15",
-        onChange: jest.fn(),
-        triggerRef: triggerRef as React.RefObject<HTMLButtonElement>,
       });
 
       // "Sep 2025" should be disabled
@@ -633,17 +576,14 @@ describe("useDatePickerPopover", () => {
     });
 
     it("should disable individual years after maxDate", () => {
-      const { rerender, result, triggerRef } = setupHook({
+      const { rerender, result } = setupHook({
         maxDateProp: "2025-10-15",
       });
       act(() => {
         result.current.setIsOpen(true);
       });
       rerender({
-        value: null,
         maxDateProp: "2025-10-15",
-        onChange: jest.fn(),
-        triggerRef: triggerRef as React.RefObject<HTMLButtonElement>,
       });
 
       // Go to year view
@@ -660,10 +600,7 @@ describe("useDatePickerPopover", () => {
         );
       });
       rerender({
-        value: null,
         maxDateProp: "2025-10-15",
-        onChange: jest.fn(),
-        triggerRef: triggerRef as React.RefObject<HTMLButtonElement>,
       });
 
       // "2026" should be disabled
@@ -685,7 +622,7 @@ describe("useDatePickerPopover", () => {
             value: "2025-10-15",
             onChange: jest.fn(),
             triggerRef: triggerRef,
-          } as UseDatePickerPopoverProps, // Cast to UseDatePickerPopoverProps
+          } as UseDatePickerPopoverProps,
         }
       );
 
@@ -709,15 +646,11 @@ describe("useDatePickerPopover", () => {
   // --- NEW: Today Button Tests ---
   describe("Today Button", () => {
     it('should render the "Today" button and be enabled', () => {
-      const { result, rerender, triggerRef } = setupHook();
+      const { result, rerender } = setupHook();
       act(() => {
         result.current.setIsOpen(true);
       });
-      rerender({
-        value: null,
-        onChange: jest.fn(),
-        triggerRef: triggerRef as React.RefObject<HTMLButtonElement>,
-      });
+      rerender();
 
       const todayButton = screen.getByRole("button", {
         name: `Select Today, ${format(TODAY_DATE, "PPP")}`,
@@ -727,7 +660,7 @@ describe("useDatePickerPopover", () => {
     });
 
     it("should select today and close the popover when clicked", () => {
-      const { result, rerender, mockOnChange, triggerRef } = setupHook({
+      const { result, rerender, mockOnChange } = setupHook({
         value: "2025-01-01",
       });
       act(() => {
@@ -736,7 +669,6 @@ describe("useDatePickerPopover", () => {
       rerender({
         value: "2025-01-01",
         onChange: mockOnChange,
-        triggerRef: triggerRef as React.RefObject<HTMLButtonElement>,
       });
 
       // Check that we are viewing Jan 2025
@@ -765,17 +697,14 @@ describe("useDatePickerPopover", () => {
 
     it('should disable the "Today" button if today is before minDate', () => {
       const minDate = "2025-10-27"; // One day after today
-      const { result, rerender, triggerRef } = setupHook({
+      const { result, rerender } = setupHook({
         minDateProp: minDate,
       });
       act(() => {
         result.current.setIsOpen(true);
       });
       rerender({
-        value: null,
         minDateProp: minDate,
-        onChange: jest.fn(),
-        triggerRef: triggerRef as React.RefObject<HTMLButtonElement>,
       });
 
       const todayButton = screen.getByRole("button", {
@@ -786,17 +715,14 @@ describe("useDatePickerPopover", () => {
 
     it('should disable the "Today" button if today is after maxDate', () => {
       const maxDate = "2025-10-25"; // One day before today
-      const { result, rerender, triggerRef } = setupHook({
+      const { result, rerender } = setupHook({
         maxDateProp: maxDate,
       });
       act(() => {
         result.current.setIsOpen(true);
       });
       rerender({
-        value: null,
         maxDateProp: maxDate,
-        onChange: jest.fn(),
-        triggerRef: triggerRef as React.RefObject<HTMLButtonElement>,
       });
 
       const todayButton = screen.getByRole("button", {
@@ -807,17 +733,15 @@ describe("useDatePickerPopover", () => {
 
     it('should not select today or close when clicking disabled "Today" button', () => {
       const maxDate = "2025-10-25"; // One day before today
-      const { result, rerender, mockOnChange, triggerRef } = setupHook({
+      const { result, rerender, mockOnChange } = setupHook({
         maxDateProp: maxDate,
       });
       act(() => {
         result.current.setIsOpen(true);
       });
       rerender({
-        value: null,
         maxDateProp: maxDate,
         onChange: mockOnChange,
-        triggerRef: triggerRef as React.RefObject<HTMLButtonElement>,
       });
 
       const todayButton = screen.getByRole("button", {

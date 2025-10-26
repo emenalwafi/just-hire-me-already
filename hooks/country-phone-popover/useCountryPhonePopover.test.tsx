@@ -1,5 +1,5 @@
 import React from "react";
-import { renderHook, act } from "@testing-library/react";
+import { renderHook, act, RenderHookResult } from "@testing-library/react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import {
@@ -80,14 +80,25 @@ const setupHook = (props: Partial<UseCountryPhonePopoverProps> = {}) => {
     }
   );
 
-  // 4. Render the returned popoverElement (if it exists)
-  hookResult.result.current.popoverElement &&
-    render(hookResult.result.current.popoverElement);
+  // 4. Render the returned popoverElement and get the element's rerender function
+  const { rerender: rerenderElement } = render(
+    hookResult.result.current.popoverElement
+  );
+
+  // 5. Wrap the hook's rerender function to also rerender the element
+  const originalRerender = hookResult.rerender;
+  hookResult.rerender = (newProps) => {
+    // Rerender the hook first
+    originalRerender(newProps);
+    // THEN, rerender the element with the hook's new popoverElement value
+    rerenderElement(hookResult.result.current.popoverElement);
+  };
 
   return {
     ...hookResult,
     mockOnSelectCountry,
     anchorRef,
+    rerenderElement,
   };
 };
 
@@ -119,6 +130,7 @@ describe("useCountryPhonePopover", () => {
         result.current.setIsOpen(true);
       });
       // Rerender to get the new popoverElement
+      // This calls our *wrapped* rerender, which updates both hook and element
       rerender({
         anchorRef: anchorRef as React.RefObject<HTMLElement>,
         onSelectCountry: mockOnSelectCountry,
@@ -128,7 +140,10 @@ describe("useCountryPhonePopover", () => {
       expect(result.current.isOpen).toBe(true);
       expect(result.current.popoverElement).not.toBe(null);
       expect(
-        screen.getByRole("dialog", { name: "Select Country Code" })
+        screen.getByRole("dialog", {
+          name: "Select Country Code",
+          hidden: false,
+        })
       ).toBeInTheDocument();
     });
 
@@ -182,12 +197,32 @@ describe("useCountryPhonePopover", () => {
 
   // --- Filtering and Searching ---
   describe("Filtering and Searching", () => {
+    let hookResult: RenderHookResult<
+      ReturnType<typeof useCountryPhonePopover>,
+      UseCountryPhonePopoverProps
+    >["result"];
+    let rerenderElement: (ui: React.ReactElement | null) => void;
+    let mockOnSelectCountry: jest.Mock;
+
     beforeEach(() => {
       // Open the popover before each test in this block
-      const { result, rerender, anchorRef, mockOnSelectCountry } = setupHook();
+      const {
+        result,
+        rerender,
+        anchorRef,
+        mockOnSelectCountry: selectMock,
+        rerenderElement: elRerender,
+      } = setupHook();
+
+      // Store references for tests
+      hookResult = result;
+      rerenderElement = elRerender;
+      mockOnSelectCountry = selectMock;
+
       act(() => {
         result.current.setIsOpen(true);
       });
+      // This calls our wrapped rerender, syncing hook and element
       rerender({
         anchorRef: anchorRef as React.RefObject<HTMLElement>,
         onSelectCountry: mockOnSelectCountry,
@@ -200,6 +235,8 @@ describe("useCountryPhonePopover", () => {
       act(() => {
         fireEvent.change(searchInput, { target: { value: "Japan" } });
       });
+
+      rerenderElement(hookResult.current.popoverElement);
 
       expect(screen.getByRole("button", { name: /Japan/ })).toBeInTheDocument();
       expect(
@@ -216,6 +253,8 @@ describe("useCountryPhonePopover", () => {
         fireEvent.change(searchInput, { target: { value: "+62" } });
       });
 
+      rerenderElement(hookResult.current.popoverElement);
+
       expect(
         screen.getByRole("button", { name: /Indonesia/ })
       ).toBeInTheDocument();
@@ -230,6 +269,8 @@ describe("useCountryPhonePopover", () => {
         fireEvent.change(searchInput, { target: { value: "81" } });
       });
 
+      rerenderElement(hookResult.current.popoverElement);
+
       expect(screen.getByRole("button", { name: /Japan/ })).toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: /Indonesia/ })
@@ -241,6 +282,8 @@ describe("useCountryPhonePopover", () => {
       act(() => {
         fireEvent.change(searchInput, { target: { value: "US" } });
       });
+
+      rerenderElement(hookResult.current.popoverElement);
 
       expect(
         screen.getByRole("button", { name: /United States/ })
@@ -256,6 +299,8 @@ describe("useCountryPhonePopover", () => {
         fireEvent.change(searchInput, { target: { value: "indonesia" } });
       });
 
+      rerenderElement(hookResult.current.popoverElement);
+
       expect(
         screen.getByRole("button", { name: /Indonesia/ })
       ).toBeInTheDocument();
@@ -266,6 +311,8 @@ describe("useCountryPhonePopover", () => {
       act(() => {
         fireEvent.change(searchInput, { target: { value: "zzzz" } });
       });
+
+      rerenderElement(hookResult.current.popoverElement);
 
       expect(
         screen.queryByRole("button", { name: /Indonesia/ })
@@ -320,7 +367,7 @@ describe("useCountryPhonePopover", () => {
 
       // Check default (inactive) state for Indonesia
       expect(idButton).not.toHaveClass("bg-primary-surface");
-      expect(idButton).not.toHaveAttribute("aria-pressed");
+      expect(idButton).toHaveAttribute("aria-pressed", "false");
       expect(idButton).toHaveClass("bg-neutral-10 hover:bg-neutral-20");
       expect(idName).toHaveClass("text-neutral-100");
       expect(idCode).toHaveClass("text-neutral-100");

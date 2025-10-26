@@ -7,42 +7,57 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 
-// Define the structure for dropdown options
+/**
+ * Defines the basic structure for an option in the dropdown.
+ */
 export interface DropdownOption {
+  /** A unique identifier for the option. */
   id: string | number;
+  /** The text to be displayed for the option. */
   label: string;
-  // Add other properties as needed (e.g., disabled, icon)
 }
 
-// Props for the hook
-interface UseDropdownPopoverProps {
-  /** Ref of the element the popover should anchor to. Accepts null. */
+/**
+ * Props for the `useDropdownPopover` hook.
+ */
+export interface UseDropdownPopoverProps {
+  /** A React ref to the element the popover should be anchored to. */
   anchorRef: React.RefObject<HTMLElement | null>;
-  /** Array of options to display */
+  /** The complete list of options to be displayed or filtered. */
   options: DropdownOption[];
-  /** Value (id) of the currently selected option, or null */
+  /** The `id` of the currently selected option, for highlighting. */
   selectedValue?: string | number | null;
-  /** Current search term from the input (if applicable) */
-  searchTerm?: string; // Made optional as not all dropdowns filter
-  /** Callback function when an option is selected */
+  /** The current search term to filter the `options` by. */
+  searchTerm?: string;
+  /** Callback function fired when a user selects an option. */
   onSelectOption: (option: DropdownOption) => void;
-  /** Boolean indicating if the popover is open */
+  /** Boolean state indicating if the popover should be open. */
   isOpen: boolean;
-  /** Function to close the popover */
+  /** Callback function to signal that the popover should close. */
   onClose: () => void;
-  // Removed popoverWidth prop
 }
 
-// Return type of the hook
+/**
+ * The return value of the `useDropdownPopover` hook.
+ */
 interface UseDropdownPopoverReturn {
-  popoverElement: React.ReactPortal | null; // The popover JSX to render
+  /** The React Portal element containing the popover. Render this in your component. */
+  popoverElement: React.ReactPortal | null;
 }
 
+/**
+ * A React hook that provides the logic and UI for a generic dropdown popover.
+ * It handles positioning relative to an anchor, filtering based on a search term,
+ * and click-outside detection. The open/close state is controlled by the parent.
+ *
+ * @param {UseDropdownPopoverProps} props - The configuration props for the hook.
+ * @returns {UseDropdownPopoverReturn} - An object containing the popover element.
+ */
 export function useDropdownPopover({
   anchorRef,
   options,
   selectedValue,
-  searchTerm = "", // Default search term to empty string
+  searchTerm = "",
   onSelectOption,
   isOpen,
   onClose,
@@ -51,37 +66,35 @@ export function useDropdownPopover({
   const [popoverPosition, setPopoverPosition] = useState<{
     top: number;
     left: number;
-    // Changed minWidth to width as we'll now set the exact width
     width: number;
   } | null>(null);
 
-  // Filter options based on the search term passed from the parent
+  /** Memoized list of options filtered by the provided search term. */
   const filteredOptions = useMemo(() => {
     const lowerSearchTerm = searchTerm.toLowerCase().trim();
     if (!lowerSearchTerm) {
-      return options; // Show all if search is empty
+      return options;
     }
-    // Filter based on label containing the search term
     return options.filter((option) =>
       option.label.toLowerCase().includes(lowerSearchTerm)
     );
   }, [options, searchTerm]);
 
-  // --- Calculate Popover Position ---
+  /** Effect to calculate and set the popover's position and width. */
   useEffect(() => {
     if (isOpen && anchorRef.current) {
       const rect = anchorRef.current.getBoundingClientRect();
       setPopoverPosition({
-        top: rect.bottom + window.scrollY + 4, // Position below the anchor + 4px gap
-        left: rect.left + window.scrollX, // Align left edges
-        width: rect.width, // Store anchor width
+        top: rect.bottom + window.scrollY + 4,
+        left: rect.left + window.scrollX,
+        width: rect.width,
       });
     } else {
-      setPopoverPosition(null); // Reset position when closed
+      setPopoverPosition(null);
     }
   }, [isOpen, anchorRef]);
 
-  // --- Close on Outside Click ---
+  /** Effect to add a "click outside" listener to close the popover. */
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -100,15 +113,15 @@ export function useDropdownPopover({
     };
   }, [isOpen, onClose, popoverRef, anchorRef]);
 
+  /** Stable callback for when an option is selected. */
   const handleSelect = useCallback(
     (option: DropdownOption) => {
       onSelectOption(option);
-      // Let the parent component handle closing
     },
     [onSelectOption]
   );
 
-  // --- Popover JSX ---
+  /** Memoized JSX for the popover's content. */
   const popoverContent = useMemo(() => {
     if (!isOpen || !popoverPosition) return null;
 
@@ -121,27 +134,24 @@ export function useDropdownPopover({
           position: "absolute",
           top: `${popoverPosition.top}px`,
           left: `${popoverPosition.left}px`,
-          width: `${popoverPosition.width}px`, // Apply exact width based on anchor
+          width: `${popoverPosition.width}px`,
           zIndex: 50,
         }}
-        // Removed max-w-[572px] class, width is now controlled by style
         className={`py-2 bg-neutral-10 rounded-lg shadow-[0px_4px_8px_0px_rgba(0,0,0,0.10)] outline outline-1 outline-offset-[-1px] outline-neutral-40 inline-flex flex-col justify-start items-start overflow-hidden font-sans`}
         onKeyDown={(e) => e.key === "Escape" && onClose()}
       >
-        {/* Scrollable container for options */}
         <div className="self-stretch max-h-60 overflow-y-auto">
           {filteredOptions.length > 0 ? (
             filteredOptions.map((option) => {
               const isSelected = selectedValue === option.id;
               let itemClasses =
                 "self-stretch w-full px-4 py-2 inline-flex justify-start items-center gap-2 text-left transition-colors cursor-pointer";
-              // Apply hover/focus within the scrollable div
               itemClasses += isSelected
                 ? " bg-primary-surface"
                 : " bg-white hover:bg-neutral-20 focus:bg-neutral-20 focus:outline-none";
 
               let textClasses =
-                "flex-1 justify-start text-sm font-bold truncate"; // Ensure truncate is here
+                "flex-1 justify-start text-sm font-bold truncate";
               textClasses += isSelected
                 ? " text-primary-main"
                 : " text-neutral-100";
@@ -185,7 +195,7 @@ export function useDropdownPopover({
     searchTerm,
   ]);
 
-  // Portal creation
+  /** Creates the React Portal for the popover, ensuring it only runs client-side. */
   const popoverElement =
     typeof document !== "undefined" && popoverContent
       ? createPortal(popoverContent, document.body)

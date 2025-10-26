@@ -6,13 +6,17 @@ import { useDatePickerPopover } from "@/hooks/date-picker-popover/useDatePickerP
 // --- Mocks ---
 
 // 1. Mock the useDatePickerPopover hook
-jest.mock("@/hooks/date-picker-popover/useDatePickerPopover");
+jest.mock("../../hooks/date-picker-popover/useDatePickerPopover");
 const mockedUseDatePickerPopover = useDatePickerPopover as jest.Mock;
 
 // 2. Mock the icon library
 jest.mock("@iconscout/react-unicons", () => ({
-  UilCalendarAlt: () => <span data-testid="icon-calendar" />,
-  UilAngleDown: () => <span data-testid="icon-angle-down" />,
+  UilCalendarAlt: (props: { className: string }) => (
+    <span data-testid="icon-calendar" className={props.className} />
+  ),
+  UilAngleDown: (props: { className: string }) => (
+    <span data-testid="icon-angle-down" className={props.className} />
+  ),
 }));
 
 // --- Test Setup ---
@@ -76,7 +80,7 @@ describe("DatePicker Component", () => {
     render(<DatePicker value="2025-10-26" onChange={jest.fn()} />);
 
     // The component formats this date using 'PPP'
-    const formattedDate = screen.getByText("Oct 26, 2025");
+    const formattedDate = screen.getByText("October 26th, 2025");
     expect(formattedDate).toBeInTheDocument();
     // Check for the "has value" text color
     expect(formattedDate).toHaveClass("text-neutral-90");
