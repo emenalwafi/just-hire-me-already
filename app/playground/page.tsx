@@ -1,27 +1,14 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useMemo, useState } from "react"; // Removed useRef as it's handled within PhoneNumberInput
 import Chip from "@/components/chip/Chip";
 import DatePicker from "@/components/date-picker/DatePicker";
-
+// Import the PhoneNumberInput component
+import PhoneNumberInput from "@/components/phone-number-input/PhoneNumberInput";
 import {
-  useCountryPhonePopover,
   Country,
+  getAllCountryData,
 } from "@/hooks/country-phone-popover/useCountryPhonePopover";
-// Import the Flags object to render dynamically
-import * as Flags from "country-flag-icons/react/3x2";
-
-// Helper component to render flag dynamically based on selected country
-const DynamicFlag = ({
-  countryCode,
-  ...props
-}: {
-  countryCode: string;
-  [key: string]: any;
-}) => {
-  const Flag = Flags[countryCode.toUpperCase() as keyof typeof Flags];
-  return Flag ? <Flag {...props} /> : null; // Render null if flag component doesn't exist
-};
 
 export default function Home() {
   const [selectedChip, setSelectedChip] = useState<string | null>("rest");
@@ -33,29 +20,115 @@ export default function Home() {
     "2022-08-20"
   ); // Example with bounds
 
-  // --- State and Refs for Country Phone Popover ---
-  const [selectedCountry, setSelectedCountry] = useState<Country | null>(null); // State to hold the selected country object
-  const countryTriggerRef = useRef<HTMLButtonElement>(null); // Ref for the trigger button
-  const disabledCountryTriggerRef = useRef<HTMLButtonElement>(null); // Ref for the disabled trigger button
+  const [phoneNumber1, setPhoneNumber1] = useState<string | null>(null);
+  const [iso1, setIso1] = useState<string | null>("ID"); // Default ISO for example 1
 
-  // --- Control disabled state for the second button ---
-  // const [isCountrySelectorDisabled, setIsCountrySelectorDisabled] = useState(true);
+  const [phoneNumber2, setPhoneNumber2] = useState<string | null>("+44");
+  const [iso2, setIso2] = useState<string | null>(null); // ISO will be derived from value initially
 
-  // --- Example list of disabled country ISO codes ---
-  const exampleDisabledIsos = ["US", "GB", "AU"]; // Disable United States, UK, Australia
+  const [phoneNumber3, setPhoneNumber3] = useState<string | null>("+124212345");
+  const [iso3, setIso3] = useState<string | null>(null); // ISO will be derived initially
 
-  // Use the country popover hook for the ENABLED selector
-  const {
-    isOpen: isCountryPopoverOpen,
-    setIsOpen: setCountryPopoverOpen,
-    popoverElement: countryPopoverElement,
-  } = useCountryPhonePopover({
-    anchorRef: countryTriggerRef, // Pass the ref of the ENABLED trigger element
-    onSelectCountry: setSelectedCountry, // Function to update selected country state
-    selectedCountryIso: selectedCountry?.iso, // Pass the ISO of the currently selected country
-    disabledCountryIsos: exampleDisabledIsos, // Pass the array of disabled ISOs
-    initialIsOpen: false, // Start closed
-  });
+  const [phoneNumber4, setPhoneNumber4] = useState<string | null>(
+    "+628123456789"
+  );
+  const [iso4, setIso4] = useState<string | null>(null); // ISO will be derived initially
+
+  const [phoneNumberControlled, setPhoneNumberControlled] = useState<
+    string | null
+  >(null);
+  const [controlledIso, setControlledIso] = useState<string | null>("US"); // Start with US selected
+
+  // --- Handlers for country change in each example ---
+  const handleCountryChange1 = (country: Country | null) => {
+    console.log("Country 1 Changed:", country);
+    setIso1(country?.iso || null);
+    // If number part is empty, update value to just the new code
+    if (!nationalNumber1) {
+      setPhoneNumber1(country?.code || null);
+    }
+  };
+  const handleCountryChange2 = (country: Country | null) => {
+    console.log("Country 2 Changed:", country);
+    setIso2(country?.iso || null);
+    if (!nationalNumber2) {
+      setPhoneNumber2(country?.code || null);
+    }
+  };
+  const handleCountryChange3 = (country: Country | null) => {
+    console.log("Country 3 Changed:", country);
+    setIso3(country?.iso || null);
+    if (!nationalNumber3) {
+      setPhoneNumber3(country?.code || null);
+    }
+  };
+  const handleCountryChange4 = (country: Country | null) => {
+    console.log("Country 4 Changed:", country);
+    setIso4(country?.iso || null);
+    if (!nationalNumber4) {
+      setPhoneNumber4(country?.code || null);
+    }
+  };
+  const handleCountryChangeControlled = (country: Country | null) => {
+    console.log("Country Controlled Changed:", country);
+    setControlledIso(country?.iso || null);
+    if (!nationalNumberControlled) {
+      setPhoneNumberControlled(country?.code || null);
+    }
+  };
+
+  // --- Helper logic to display national number (repeated for each example) ---
+  const nationalNumber1 = useMemo(() => {
+    if (!phoneNumber1) return "";
+    const countries = getAllCountryData();
+    const country = countries.find((c) => c.iso === iso1?.toUpperCase());
+    if (country && phoneNumber1.startsWith(country.code)) {
+      return phoneNumber1.substring(country.code.length);
+    }
+    return phoneNumber1;
+  }, [phoneNumber1, iso1]);
+
+  const nationalNumber2 = useMemo(() => {
+    if (!phoneNumber2) return "";
+    const countries = getAllCountryData();
+    const country = countries.find((c) => c.iso === iso2?.toUpperCase());
+    if (country && phoneNumber2.startsWith(country.code)) {
+      return phoneNumber2.substring(country.code.length);
+    }
+    return phoneNumber2;
+  }, [phoneNumber2, iso2]);
+
+  const nationalNumber3 = useMemo(() => {
+    if (!phoneNumber3) return "";
+    const countries = getAllCountryData();
+    const country = countries.find((c) => c.iso === iso3?.toUpperCase());
+    if (country && phoneNumber3.startsWith(country.code)) {
+      return phoneNumber3.substring(country.code.length);
+    }
+    return phoneNumber3;
+  }, [phoneNumber3, iso3]);
+
+  const nationalNumber4 = useMemo(() => {
+    if (!phoneNumber4) return "";
+    const countries = getAllCountryData();
+    const country = countries.find((c) => c.iso === iso4?.toUpperCase());
+    if (country && phoneNumber4.startsWith(country.code)) {
+      return phoneNumber4.substring(country.code.length);
+    }
+    return phoneNumber4;
+  }, [phoneNumber4, iso4]);
+
+  const nationalNumberControlled = useMemo(() => {
+    if (!phoneNumberControlled) return "";
+    const countries = getAllCountryData();
+    const country = countries.find(
+      (c) => c.iso === controlledIso?.toUpperCase()
+    );
+    if (country && phoneNumberControlled.startsWith(country.code)) {
+      return phoneNumberControlled.substring(country.code.length);
+    }
+    return phoneNumberControlled;
+  }, [phoneNumberControlled, controlledIso]);
 
   return (
     <div className="p-8 space-y-8">
@@ -162,116 +235,121 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Country Phone Popover Section */}
+      {/* --- Phone Number Input Section --- */}
       <section>
-        <h2 className="text-xl font-bold mb-4">Country Phone Popover Hook</h2>
-        <div className="flex flex-wrap gap-8 items-start">
+        <h2 className="text-xl font-bold mb-4">
+          Phone Number Input (Controlled ISO)
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-12 items-start">
           {" "}
-          {/* Use flex for side-by-side */}
-          {/* Enabled Example */}
+          {/* Increased vertical gap */}
+          {/* Example 1: Basic */}
           <div>
-            <label className="block text-sm font-medium text-neutral-70 mb-1">
-              Select Country Code (Enabled, US/GB/AU Disabled):
-            </label>
-            {/* Enabled Trigger Button */}
-            <button
-              ref={countryTriggerRef}
-              type="button"
-              onClick={() => setCountryPopoverOpen(true)} // Open the popover on click
-              className="inline-flex items-center gap-2 px-3 py-1.5 border border-neutral-40 rounded-md bg-white hover:bg-neutral-20 focus:outline-none focus:ring-2 focus:ring-primary-focus/50"
-              aria-haspopup="true"
-              aria-expanded={isCountryPopoverOpen}
-            >
-              {selectedCountry ? (
-                <>
-                  <div className="w-4 h-4 rounded-full overflow-hidden flex-shrink-0">
-                    <DynamicFlag
-                      countryCode={selectedCountry.iso}
-                      title={selectedCountry.name}
-                    />
-                  </div>
-                  <span className="text-sm text-neutral-90">
-                    {selectedCountry.code}
-                  </span>
-                </>
-              ) : (
-                <span className="text-sm text-neutral-60">Select Code</span>
-              )}
-              {/* Down Arrow */}
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4 text-neutral-60"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            </button>
+            <PhoneNumberInput
+              label="Phone number (ID Default)"
+              required
+              value={phoneNumber1}
+              onChange={setPhoneNumber1}
+              selectedCountryIso={iso1} // Pass controlled ISO
+              onCountryChange={handleCountryChange1} // Handle country change
+              defaultCountryIso="ID" // Fallback if selectedCountryIso is null initially
+              disabledCountryIsos={["US", "GB"]}
+            />
             <p className="text-xs text-neutral-60 mt-1">
-              Selected:{" "}
-              {selectedCountry
-                ? `${selectedCountry.name} (${selectedCountry.code})`
-                : "None"}
+              Value: {phoneNumber1 || "None"} | ISO: {iso1 || "None"} | NatNum:{" "}
+              {nationalNumber1}
             </p>
-
-            {/* Render the popover element associated with the enabled trigger */}
-            {countryPopoverElement}
           </div>
-          {/* Disabled Example */}
+          {/* Example 2: Initial Country Code (GB) */}
           <div>
-            <label className="block text-sm font-medium text-neutral-70 mb-1">
-              Select Country Code (Disabled):
-            </label>
-            {/* Disabled Trigger Button */}
-            <button
-              ref={disabledCountryTriggerRef}
-              type="button"
-              disabled // Add disabled attribute
-              // Apply disabled styles
-              className="inline-flex items-center gap-2 px-3 py-1.5 border border-neutral-40 rounded-md bg-neutral-30 cursor-not-allowed"
-            >
-              {/* Always show placeholder text and disabled colors */}
-              <span className="text-sm text-neutral-60">Select Code</span>
-              {/* Down Arrow with disabled color */}
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4 text-neutral-60"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            </button>
+            <PhoneNumberInput
+              label="UK Number (from value)"
+              value={phoneNumber2}
+              onChange={setPhoneNumber2}
+              selectedCountryIso={iso2} // Pass controlled ISO
+              onCountryChange={handleCountryChange2} // Handle country change
+              defaultCountryIso="ID" // Fallback
+            />
             <p className="text-xs text-neutral-60 mt-1">
-              Selected: None (Disabled)
+              Value: {phoneNumber2 || "None"} | ISO: {iso2 || "None"} | NatNum:{" "}
+              {nationalNumber2}
             </p>
-
-            {/* Optionally render the popover for the disabled button if needed, but likely not */}
-            {/* {disabledPopoverElement} */}
           </div>
-          {/* Toggle Disabled State */}
-          {/*
-            <div className="w-full mt-4">
-                 <button
-                    onClick={() => setIsCountrySelectorDisabled(!isCountrySelectorDisabled)}
-                    className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
-                 >
-                     Toggle Disabled State for Second Button
-                 </button>
+          {/* Example 3: Error State */}
+          <div>
+            <PhoneNumberInput
+              label="Phone with Error"
+              required
+              value={phoneNumber3}
+              onChange={setPhoneNumber3}
+              selectedCountryIso={iso3} // Pass controlled ISO
+              onCountryChange={handleCountryChange3} // Handle country change
+              error="Please enter a valid phone number."
+            />
+            <p className="text-xs text-neutral-60 mt-1">
+              Value: {phoneNumber3 || "None"} | ISO: {iso3 || "None"} | NatNum:{" "}
+              {nationalNumber3}
+            </p>
+          </div>
+          {/* Example 4: Disabled State */}
+          <div>
+            <PhoneNumberInput
+              label="Disabled Input"
+              value={phoneNumber4}
+              onChange={setPhoneNumber4}
+              selectedCountryIso={iso4} // Pass controlled ISO
+              onCountryChange={handleCountryChange4} // Handle country change (won't be called if disabled)
+              disabled={true}
+            />
+            <p className="text-xs text-neutral-60 mt-1">
+              Value: {phoneNumber4 || "None"} | ISO: {iso4 || "None"} (Disabled)
+              | NatNum: {nationalNumber4}
+            </p>
+          </div>
+          {/* Example 5: Controlled Country Selection (already done) */}
+          <div className="md:col-span-2">
+            <PhoneNumberInput
+              label="Phone Number (Externally Controlled Country)"
+              required
+              value={phoneNumberControlled}
+              onChange={setPhoneNumberControlled}
+              selectedCountryIso={controlledIso}
+              onCountryChange={handleCountryChangeControlled}
+              defaultCountryIso="JP"
+              placeholder="Enter phone number"
+            />
+            <p className="text-xs text-neutral-60 mt-1">
+              Full Value: {phoneNumberControlled || "None"} | Selected ISO:{" "}
+              {controlledIso || "None"} | National Num:{" "}
+              {nationalNumberControlled}
+            </p>
+            <div className="mt-2 space-x-2">
+              <button
+                onClick={() => setControlledIso("ID")}
+                className="text-xs p-1 border rounded bg-neutral-10"
+              >
+                Set ID
+              </button>
+              <button
+                onClick={() => setControlledIso("GB")}
+                className="text-xs p-1 border rounded bg-neutral-10"
+              >
+                Set GB
+              </button>
+              <button
+                onClick={() => setControlledIso("CA")}
+                className="text-xs p-1 border rounded bg-neutral-10"
+              >
+                Set CA
+              </button>
+              <button
+                onClick={() => setControlledIso(null)}
+                className="text-xs p-1 border rounded bg-neutral-10"
+              >
+                Set Null (Fallback to Default)
+              </button>
             </div>
-             */}
+          </div>
         </div>
       </section>
     </div>

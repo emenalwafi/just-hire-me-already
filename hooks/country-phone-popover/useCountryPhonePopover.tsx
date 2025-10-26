@@ -24,7 +24,7 @@ export interface Country {
 }
 
 // Function to fetch and map country data using libphonenumber-js and Intl
-const getAllCountryData = (): Country[] => {
+export const getAllCountryData = (): Country[] => {
   // Get ISO country codes supported by libphonenumber-js
   const countryCodes = getCountries();
   // Use Intl.DisplayNames to get country names
@@ -211,6 +211,7 @@ export function useCountryPhonePopover({
             </div>
             <input
               type="text"
+              autoFocus
               placeholder="Search country or code"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
