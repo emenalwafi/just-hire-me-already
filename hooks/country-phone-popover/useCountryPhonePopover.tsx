@@ -7,37 +7,42 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 import { UilSearch } from "@iconscout/react-unicons";
-// Import from libphonenumber-js
 import {
   getCountries,
   getCountryCallingCode,
   CountryCode,
-} from "libphonenumber-js/max"; // Use /max for metadata
-// Import the flag components dynamically or use a helper
+} from "libphonenumber-js/max";
 import * as Flags from "country-flag-icons/react/3x2";
 
-// Define the structure for our internal country object
+/**
+ * Describes the data structure for a country.
+ */
 export interface Country {
+  /** The full, localized name of the country (e.g., "Indonesia"). */
   name: string;
-  code: string; // Phone code (e.g., '+62')
-  iso: string; // ISO 3166-1 alpha-2 code (e.g., 'ID')
+  /** The international phone calling code, including the '+' (e.g., "+62"). */
+  code: string;
+  /** The ISO 3166-1 alpha-2 country code (e.g., "ID"). */
+  iso: string;
 }
 
-// Function to fetch and map country data using libphonenumber-js and Intl
+/**
+ * Generates a sorted list of countries with their names, phone codes, and ISO codes.
+ * It fetches data using `libphonenumber-js` and `Intl.DisplayNames`.
+ * @returns {Country[]} A list of `Country` objects, sorted alphabetically by name.
+ */
 export const getAllCountryData = (): Country[] => {
-  // Get ISO country codes supported by libphonenumber-js
   const countryCodes = getCountries();
-  // Use Intl.DisplayNames to get country names
-  const regionNames = new Intl.DisplayNames(["en"], { type: "region" }); // 'en' for English names
+  const regionNames = new Intl.DisplayNames(["en"], { type: "region" });
 
   const countryData: Country[] = [];
 
   countryCodes.forEach((isoCode: CountryCode) => {
     try {
       const callingCode = getCountryCallingCode(isoCode);
-      // Ensure the ISO code exists in the Flags object and we have a calling code
-      // Also filter out codes like '001' which might not have a standard name
       const name = regionNames.of(isoCode);
+
+      // Only include countries that have a valid flag, calling code, and name.
       if (Flags[isoCode as keyof typeof Flags] && callingCode && name) {
         countryData.push({
           name: name,
@@ -46,42 +51,56 @@ export const getAllCountryData = (): Country[] => {
         });
       }
     } catch (error) {
-      // Ignore countries where getCountryCallingCode might fail (e.g., '001')
-      // console.warn(`Could not get calling code for ${isoCode}:`, error);
+      // Silently ignore errors for codes that fail (e.g., '001')
     }
   });
 
-  // Sort alphabetically by country name
   return countryData.sort((a, b) => a.name.localeCompare(b.name));
 };
 
-// Props for the hook
-interface UseCountryPhonePopoverProps {
-  /** Ref of the element the popover should anchor to. Accepts null. */
+/**
+ * Props for the `useCountryPhonePopover` hook.
+ */
+export interface UseCountryPhonePopoverProps {
+  /** A React ref to the element the popover should be anchored to. */
   anchorRef: React.RefObject<HTMLElement | null>;
-  /** Callback function when a country is selected */
+  /** Callback function fired when a country is selected from the list. */
   onSelectCountry: (country: Country) => void;
-  /** ISO code of the currently selected country, or null */
+  /** The ISO code of the currently selected country, used for highlighting. */
   selectedCountryIso?: string | null;
-  /** Optional: You can pass a custom list, otherwise uses the library */
+  /** An optional custom array of `Country` objects to use instead of the default. */
   countries?: Country[];
-  /** Optional: Initial open state */
+  /** Optional override for the initial open state of the popover. */
   initialIsOpen?: boolean;
-  /** Optional: Array of ISO codes for countries to disable */
+  /** An optional array of country ISO codes to disable from selection. */
   disabledCountryIsos?: string[];
 }
 
-// Return type of the hook
+/**
+ * The return value of the `useCountryPhonePopover` hook.
+ */
 interface UseCountryPhonePopoverReturn {
+  /** Whether the popover is currently open. */
   isOpen: boolean;
+  /** State setter function to open or close the popover. */
   setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  popoverElement: React.ReactPortal | null; // The popover JSX to render
+  /** The React Portal element containing the popover. Render this in your component. */
+  popoverElement: React.ReactPortal | null;
+  /** The current value of the search input field. */
   searchTerm: string;
+  /** State setter function to update the search term. */
   setSearchTerm: React.Dispatch<React.SetStateAction<string>>;
+  /** The list of countries, filtered by the current `searchTerm`. */
   filteredCountries: Country[];
 }
 
-// Helper component to render flag dynamically
+/**
+ * A small helper component to dynamically render a flag from the `country-flag-icons` library.
+ * @param {object} props - Component props.
+ * @param {string} props.countryCode - The ISO 3166-1 alpha-2 code for the flag (e.g., "US").
+ * @param {any} props.props - Any other props to pass down to the SVG flag component (e.g., `className`, `title`).
+ * @returns {React.ReactElement | null} A flag SVG component or null if the code is invalid.
+ */
 const DynamicFlag = ({
   countryCode,
   ...props
@@ -89,39 +108,48 @@ const DynamicFlag = ({
   countryCode: string;
   [key: string]: any;
 }) => {
-  // Ensure countryCode is uppercase for the Flags object lookup
   const Flag = Flags[countryCode.toUpperCase() as keyof typeof Flags];
-  // Apply width and height directly to the Flag component if possible, or wrap if needed
-  // The library's components might already have inherent sizing. Adjust styling as necessary.
   return Flag ? (
     <Flag
       {...props}
       style={{ width: "100%", height: "auto", display: "block" }}
     />
-  ) : null; // Render null if flag component doesn't exist
+  ) : null;
 };
 
+/**
+ * A React hook that provides the logic, state, and UI for a country phone code selector popover.
+ *
+ * @param {UseCountryPhonePopoverProps} props - The configuration props for the hook.
+ * @returns {UseCountryPhonePopoverReturn} - An object containing state and the popover element.
+ */
 export function useCountryPhonePopover({
   anchorRef,
   onSelectCountry,
-  selectedCountryIso, // Receive selected ISO code
+  selectedCountryIso,
   countries: countriesProp,
   initialIsOpen = false,
-  disabledCountryIsos = [], // Default to empty array
+  disabledCountryIsos = [],
 }: UseCountryPhonePopoverProps): UseCountryPhonePopoverReturn {
+  /** Memoized list of countries, using the provided prop or generating a default list. */
   const countries = useMemo(
     () => countriesProp || getAllCountryData(),
     [countriesProp]
   );
+
+  /** State controlling the visibility of the popover. */
   const [isOpen, setIsOpen] = useState(initialIsOpen);
+  /** State for the value in the search input field. */
   const [searchTerm, setSearchTerm] = useState("");
+  /** A ref to the popover's main `div` element, used for click-outside detection. */
   const popoverRef = useRef<HTMLDivElement>(null);
+  /** State storing the calculated `top` and `left` position for the popover. */
   const [popoverPosition, setPopoverPosition] = useState<{
     top: number;
     left: number;
   } | null>(null);
 
-  // Filter countries based on search term
+  /** Memoized list of countries filtered by the `searchTerm`. */
   const filteredCountries = useMemo(() => {
     const lowerSearchTerm = searchTerm.toLowerCase().trim();
     if (!lowerSearchTerm) {
@@ -131,17 +159,17 @@ export function useCountryPhonePopover({
       (country) =>
         country.name.toLowerCase().includes(lowerSearchTerm) ||
         country.code.includes(lowerSearchTerm) ||
-        country.code.substring(1).includes(lowerSearchTerm) ||
+        country.code.substring(1).includes(lowerSearchTerm) || // Search without '+'
         country.iso.toLowerCase().includes(lowerSearchTerm)
     );
   }, [searchTerm, countries]);
 
-  // --- Calculate Popover Position ---
+  /** Effect to calculate the popover's position when it opens or the anchor moves. */
   useEffect(() => {
     if (isOpen && anchorRef.current) {
       const rect = anchorRef.current.getBoundingClientRect();
       setPopoverPosition({
-        top: rect.bottom + window.scrollY + 8,
+        top: rect.bottom + window.scrollY + 8, // Position 8px below the anchor
         left: rect.left + window.scrollX,
       });
     } else {
@@ -149,12 +177,13 @@ export function useCountryPhonePopover({
     }
   }, [isOpen, anchorRef]);
 
-  // --- Close on Outside Click ---
+  /** A stable function to close the popover and reset the search term. */
   const handleClose = useCallback(() => {
-    setSearchTerm(""); // Clear search term on close
+    setSearchTerm("");
     setIsOpen(false);
-  }, []); // No dependencies needed for setters
+  }, []);
 
+  /** Effect to add a "click outside" listener to close the popover. */
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -164,7 +193,7 @@ export function useCountryPhonePopover({
         anchorRef.current &&
         !anchorRef.current.contains(event.target as Node)
       ) {
-        handleClose(); // Use the combined close handler
+        handleClose();
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -173,19 +202,22 @@ export function useCountryPhonePopover({
     };
   }, [isOpen, handleClose, popoverRef, anchorRef]);
 
+  /**
+   * A stable function to handle selecting a country.
+   * It calls the `onSelectCountry` prop and closes the popover.
+   */
   const handleSelect = useCallback(
     (country: Country) => {
-      // Prevent selection if country is disabled
       if (disabledCountryIsos.includes(country.iso)) {
         return;
       }
       onSelectCountry(country);
-      handleClose(); // Close popover and clear search on selection
+      handleClose();
     },
     [onSelectCountry, handleClose, disabledCountryIsos]
   );
 
-  // --- Popover JSX ---
+  /** Memoized JSX for the popover's content. */
   const popoverContent = useMemo(() => {
     if (!isOpen || !popoverPosition) return null;
 
@@ -194,6 +226,7 @@ export function useCountryPhonePopover({
         ref={popoverRef}
         role="dialog"
         aria-modal="true"
+        aria-label="Select Country Code"
         style={{
           position: "absolute",
           top: `${popoverPosition.top}px`,
@@ -235,21 +268,21 @@ export function useCountryPhonePopover({
               let codeClasses = "justify-start text-sm";
 
               if (isDisabled) {
-                buttonClasses += " bg-neutral-10 cursor-not-allowed"; // Disabled BG, no hover
-                nameClasses += " text-neutral-60"; // Disabled text
-                codeClasses += " text-neutral-60"; // Disabled text
+                buttonClasses += " bg-neutral-10 cursor-not-allowed";
+                nameClasses += " text-neutral-60";
+                codeClasses += " text-neutral-60";
               } else if (isSelected) {
                 buttonClasses +=
-                  " bg-primary-surface focus:outline-none cursor-pointer"; // Selected BG
-                nameClasses += " text-primary-main"; // Selected Text
-                codeClasses += " text-primary-main"; // Selected Text
+                  " bg-primary-surface focus:outline-none cursor-pointer";
+                nameClasses += " text-primary-main";
+                codeClasses += " text-primary-main";
               } else {
                 buttonClasses +=
-                  " bg-neutral-10 hover:bg-neutral-20 focus:bg-neutral-20 focus:outline-none group cursor-pointer"; // Default, add group for hover effect
+                  " bg-neutral-10 hover:bg-neutral-20 focus:bg-neutral-20 focus:outline-none group cursor-pointer";
                 nameClasses +=
-                  " text-neutral-100 group-hover:text-primary-main"; // Default text + hover effect
+                  " text-neutral-100 group-hover:text-primary-main";
                 codeClasses +=
-                  " text-neutral-100 group-hover:text-primary-main"; // Default text + hover effect
+                  " text-neutral-100 group-hover:text-primary-main";
               }
 
               return (
@@ -258,14 +291,11 @@ export function useCountryPhonePopover({
                   type="button"
                   className={buttonClasses}
                   onClick={() => handleSelect(country)}
-                  disabled={isDisabled} // Add disabled attribute
-                  aria-pressed={isSelected && !isDisabled} // Indicate selected state only if not disabled
-                  aria-disabled={isDisabled} // Indicate disabled state
+                  disabled={isDisabled}
+                  aria-pressed={isSelected && !isDisabled}
+                  aria-disabled={isDisabled}
                 >
-                  {/* Apply styling to the flag container */}
                   <div className="w-4 h-4 rounded-full overflow-hidden items-center-justify-center flex border border-neutral-40">
-                    {" "}
-                    {/* Optional: dim flag */}
                     <DynamicFlag
                       countryCode={country.iso}
                       title={country.name}
@@ -278,19 +308,17 @@ export function useCountryPhonePopover({
               );
             })
           ) : (
-            // Updated "Not Found" message structure
+            // "Not Found" message
             <div className="self-stretch py-4 inline-flex justify-center items-center gap-2.5">
               <div className="text-center justify-center">
                 <span className="text-neutral-700 text-sm">Keyword </span>
-                {/* Use strong for bold */}
                 <strong className="text-neutral-700 text-base font-bold">
-                  “{searchTerm}” {/* Display the actual search term */}
+                  “{searchTerm}”
                 </strong>
                 <span className="text-neutral-700 text-sm">
                   {" "}
                   tidak ditemukan
-                </span>{" "}
-                {/* Assuming Indonesian based on example */}
+                </span>
               </div>
             </div>
           )}
@@ -307,9 +335,9 @@ export function useCountryPhonePopover({
     handleClose,
     selectedCountryIso,
     disabledCountryIsos,
-  ]); // Add dependencies
+  ]);
 
-  // Portal creation
+  /** Creates the React Portal for the popover, ensuring it only runs client-side. */
   const popoverElement =
     typeof document !== "undefined" && popoverContent
       ? createPortal(popoverContent, document.body)
