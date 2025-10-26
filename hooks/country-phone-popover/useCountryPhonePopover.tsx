@@ -36,8 +36,9 @@ const getAllCountryData = (): Country[] => {
     try {
       const callingCode = getCountryCallingCode(isoCode);
       // Ensure the ISO code exists in the Flags object and we have a calling code
-      if (Flags[isoCode as keyof typeof Flags] && callingCode) {
-        const name = regionNames.of(isoCode) || isoCode; // Fallback to ISO code if name isn't found
+      // Also filter out codes like '001' which might not have a standard name
+      const name = regionNames.of(isoCode);
+      if (Flags[isoCode as keyof typeof Flags] && callingCode && name) {
         countryData.push({
           name: name,
           code: `+${callingCode}`,
@@ -57,13 +58,17 @@ const getAllCountryData = (): Country[] => {
 // Props for the hook
 interface UseCountryPhonePopoverProps {
   /** Ref of the element the popover should anchor to. Accepts null. */
-  anchorRef: React.RefObject<HTMLElement | null>; // Changed to accept null
+  anchorRef: React.RefObject<HTMLElement | null>;
   /** Callback function when a country is selected */
   onSelectCountry: (country: Country) => void;
+  /** ISO code of the currently selected country, or null */
+  selectedCountryIso?: string | null;
   /** Optional: You can pass a custom list, otherwise uses the library */
   countries?: Country[];
   /** Optional: Initial open state */
   initialIsOpen?: boolean;
+  /** Optional: Array of ISO codes for countries to disable */
+  disabledCountryIsos?: string[];
 }
 
 // Return type of the hook
@@ -99,8 +104,10 @@ const DynamicFlag = ({
 export function useCountryPhonePopover({
   anchorRef,
   onSelectCountry,
+  selectedCountryIso, // Receive selected ISO code
   countries: countriesProp,
   initialIsOpen = false,
+  disabledCountryIsos = [], // Default to empty array
 }: UseCountryPhonePopoverProps): UseCountryPhonePopoverReturn {
   const countries = useMemo(
     () => countriesProp || getAllCountryData(),
@@ -168,10 +175,14 @@ export function useCountryPhonePopover({
 
   const handleSelect = useCallback(
     (country: Country) => {
+      // Prevent selection if country is disabled
+      if (disabledCountryIsos.includes(country.iso)) {
+        return;
+      }
       onSelectCountry(country);
       handleClose(); // Close popover and clear search on selection
     },
-    [onSelectCountry, handleClose]
+    [onSelectCountry, handleClose, disabledCountryIsos]
   );
 
   // --- Popover JSX ---
@@ -212,29 +223,59 @@ export function useCountryPhonePopover({
         {/* Country List or Not Found Message */}
         <div className="self-stretch max-h-60 overflow-y-auto bg-neutral-10 flex flex-col justify-start items-start">
           {filteredCountries.length > 0 ? (
-            filteredCountries.map((country) => (
-              <button
-                key={country.iso}
-                type="button"
-                className="self-stretch w-full px-4 py-2 bg-neutral-10 hover:bg-[#01959F0A] focus:bg-neutral-20 focus:outline-none inline-flex justify-start items-center gap-2 text-left"
-                onClick={() => handleSelect(country)}
-              >
-                {/* Apply styling to the flag container */}
-                <div className="w-4 h-4 rounded-full overflow-hidden items-center-justify-center flex border border-neutral-40">
-                  <DynamicFlag
-                    countryCode={country.iso}
-                    title={country.name}
-                    className="scale-200"
-                  />
-                </div>
-                <span className="flex-1 justify-start text-neutral-100 text-sm font-bold truncate">
-                  {country.name}
-                </span>
-                <span className="justify-start text-neutral-100 text-sm">
-                  {country.code}
-                </span>
-              </button>
-            ))
+            filteredCountries.map((country) => {
+              const isSelected = selectedCountryIso === country.iso;
+              const isDisabled = disabledCountryIsos.includes(country.iso);
+
+              let buttonClasses =
+                "self-stretch w-full px-4 py-2 inline-flex justify-start items-center gap-2 text-left transition-colors";
+              let nameClasses =
+                "flex-1 justify-start text-sm font-bold truncate";
+              let codeClasses = "justify-start text-sm";
+
+              if (isDisabled) {
+                buttonClasses += " bg-neutral-10 cursor-not-allowed"; // Disabled BG, no hover
+                nameClasses += " text-neutral-60"; // Disabled text
+                codeClasses += " text-neutral-60"; // Disabled text
+              } else if (isSelected) {
+                buttonClasses +=
+                  " bg-primary-surface focus:outline-none cursor-pointer"; // Selected BG
+                nameClasses += " text-primary-main"; // Selected Text
+                codeClasses += " text-primary-main"; // Selected Text
+              } else {
+                buttonClasses +=
+                  " bg-neutral-10 hover:bg-neutral-20 focus:bg-neutral-20 focus:outline-none group cursor-pointer"; // Default, add group for hover effect
+                nameClasses +=
+                  " text-neutral-100 group-hover:text-primary-main"; // Default text + hover effect
+                codeClasses +=
+                  " text-neutral-100 group-hover:text-primary-main"; // Default text + hover effect
+              }
+
+              return (
+                <button
+                  key={country.iso}
+                  type="button"
+                  className={buttonClasses}
+                  onClick={() => handleSelect(country)}
+                  disabled={isDisabled} // Add disabled attribute
+                  aria-pressed={isSelected && !isDisabled} // Indicate selected state only if not disabled
+                  aria-disabled={isDisabled} // Indicate disabled state
+                >
+                  {/* Apply styling to the flag container */}
+                  <div className="w-4 h-4 rounded-full overflow-hidden items-center-justify-center flex border border-neutral-40">
+                    {" "}
+                    {/* Optional: dim flag */}
+                    <DynamicFlag
+                      countryCode={country.iso}
+                      title={country.name}
+                      className={`scale-200 ${isDisabled ? "opacity-50" : ""}`}
+                    />
+                  </div>
+                  <span className={nameClasses}>{country.name}</span>
+                  <span className={codeClasses}>{country.code}</span>
+                </button>
+              );
+            })
           ) : (
             // Updated "Not Found" message structure
             <div className="self-stretch py-4 inline-flex justify-center items-center gap-2.5">
@@ -263,7 +304,9 @@ export function useCountryPhonePopover({
     filteredCountries,
     handleSelect,
     handleClose,
-  ]); // Ensure all dependencies are listed
+    selectedCountryIso,
+    disabledCountryIsos,
+  ]); // Add dependencies
 
   // Portal creation
   const popoverElement =

@@ -33,21 +33,28 @@ export default function Home() {
     "2022-08-20"
   ); // Example with bounds
 
-  const countryButtonRef = useRef<HTMLButtonElement>(null); // Ref for the trigger button
-  const [selectedCountry, setSelectedCountry] = useState<Country | null>(null); // State to store the selected country
+  // --- State and Refs for Country Phone Popover ---
+  const [selectedCountry, setSelectedCountry] = useState<Country | null>(null); // State to hold the selected country object
+  const countryTriggerRef = useRef<HTMLButtonElement>(null); // Ref for the trigger button
+  const disabledCountryTriggerRef = useRef<HTMLButtonElement>(null); // Ref for the disabled trigger button
 
-  // Use the custom hook
+  // --- Control disabled state for the second button ---
+  // const [isCountrySelectorDisabled, setIsCountrySelectorDisabled] = useState(true);
+
+  // --- Example list of disabled country ISO codes ---
+  const exampleDisabledIsos = ["US", "GB", "AU"]; // Disable United States, UK, Australia
+
+  // Use the country popover hook for the ENABLED selector
   const {
     isOpen: isCountryPopoverOpen,
     setIsOpen: setCountryPopoverOpen,
     popoverElement: countryPopoverElement,
   } = useCountryPhonePopover({
-    anchorRef: countryButtonRef, // Pass the ref of the trigger element
-    onSelectCountry: (country) => {
-      setSelectedCountry(country); // Update state when a country is selected
-      console.log("Selected Country:", country);
-    },
-    // initialIsOpen: true // Optionally start open
+    anchorRef: countryTriggerRef, // Pass the ref of the ENABLED trigger element
+    onSelectCountry: setSelectedCountry, // Function to update selected country state
+    selectedCountryIso: selectedCountry?.iso, // Pass the ISO of the currently selected country
+    disabledCountryIsos: exampleDisabledIsos, // Pass the array of disabled ISOs
+    initialIsOpen: false, // Start closed
   });
 
   return (
@@ -155,39 +162,117 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Country Phone Popover Section */}
       <section>
         <h2 className="text-xl font-bold mb-4">Country Phone Popover Hook</h2>
-        <div className="flex items-end gap-2">
-          {/* Trigger Button */}
-          <button
-            ref={countryButtonRef} // Attach the ref here
-            type="button"
-            onClick={() => setCountryPopoverOpen(true)} // Open popover on click
-            className="inline-flex items-center gap-2 px-3 py-2 border border-neutral-40 rounded-lg hover:border-neutral-70 focus:outline-none focus:ring-2 focus:ring-primary-focus/50"
-          >
-            {selectedCountry ? (
-              <div className="w-5 h-auto overflow-hidden rounded-sm">
-                {/* Use DynamicFlag helper here */}
-                <DynamicFlag
-                  countryCode={selectedCountry.iso}
-                  title={selectedCountry.name}
+        <div className="flex flex-wrap gap-8 items-start">
+          {" "}
+          {/* Use flex for side-by-side */}
+          {/* Enabled Example */}
+          <div>
+            <label className="block text-sm font-medium text-neutral-70 mb-1">
+              Select Country Code (Enabled, US/GB/AU Disabled):
+            </label>
+            {/* Enabled Trigger Button */}
+            <button
+              ref={countryTriggerRef}
+              type="button"
+              onClick={() => setCountryPopoverOpen(true)} // Open the popover on click
+              className="inline-flex items-center gap-2 px-3 py-1.5 border border-neutral-40 rounded-md bg-white hover:bg-neutral-20 focus:outline-none focus:ring-2 focus:ring-primary-focus/50"
+              aria-haspopup="true"
+              aria-expanded={isCountryPopoverOpen}
+            >
+              {selectedCountry ? (
+                <>
+                  <div className="w-4 h-4 rounded-full overflow-hidden flex-shrink-0">
+                    <DynamicFlag
+                      countryCode={selectedCountry.iso}
+                      title={selectedCountry.name}
+                    />
+                  </div>
+                  <span className="text-sm text-neutral-90">
+                    {selectedCountry.code}
+                  </span>
+                </>
+              ) : (
+                <span className="text-sm text-neutral-60">Select Code</span>
+              )}
+              {/* Down Arrow */}
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4 text-neutral-60"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
                 />
-              </div>
-            ) : (
-              <span className="text-neutral-60">Select</span>
-            )}
-            <span className="text-sm">{selectedCountry?.code ?? "Code"}</span>
-          </button>
-
-          {/* Display Selected Country (Optional) */}
-          {selectedCountry && (
-            <p className="text-sm text-neutral-70">
-              Selected: {selectedCountry.name} ({selectedCountry.code})
+              </svg>
+            </button>
+            <p className="text-xs text-neutral-60 mt-1">
+              Selected:{" "}
+              {selectedCountry
+                ? `${selectedCountry.name} (${selectedCountry.code})`
+                : "None"}
             </p>
-          )}
+
+            {/* Render the popover element associated with the enabled trigger */}
+            {countryPopoverElement}
+          </div>
+          {/* Disabled Example */}
+          <div>
+            <label className="block text-sm font-medium text-neutral-70 mb-1">
+              Select Country Code (Disabled):
+            </label>
+            {/* Disabled Trigger Button */}
+            <button
+              ref={disabledCountryTriggerRef}
+              type="button"
+              disabled // Add disabled attribute
+              // Apply disabled styles
+              className="inline-flex items-center gap-2 px-3 py-1.5 border border-neutral-40 rounded-md bg-neutral-30 cursor-not-allowed"
+            >
+              {/* Always show placeholder text and disabled colors */}
+              <span className="text-sm text-neutral-60">Select Code</span>
+              {/* Down Arrow with disabled color */}
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4 text-neutral-60"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </button>
+            <p className="text-xs text-neutral-60 mt-1">
+              Selected: None (Disabled)
+            </p>
+
+            {/* Optionally render the popover for the disabled button if needed, but likely not */}
+            {/* {disabledPopoverElement} */}
+          </div>
+          {/* Toggle Disabled State */}
+          {/*
+            <div className="w-full mt-4">
+                 <button
+                    onClick={() => setIsCountrySelectorDisabled(!isCountrySelectorDisabled)}
+                    className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
+                 >
+                     Toggle Disabled State for Second Button
+                 </button>
+            </div>
+             */}
         </div>
-        {/* Render the popover element from the hook */}
-        {countryPopoverElement}
       </section>
     </div>
   );
