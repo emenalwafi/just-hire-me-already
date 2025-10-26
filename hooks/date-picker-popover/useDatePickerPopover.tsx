@@ -429,10 +429,10 @@ export function useDatePickerPopover({
    * @returns {string} - A string of Tailwind classes.
    */
   const getNavButtonClasses = (isDisabled: boolean) => {
-    return `p-1 rounded-full cursor-pointer ${
+    return `p-1 rounded-full ${
       isDisabled
         ? "text-neutral-60 cursor-not-allowed"
-        : "text-neutral-100 hover:bg-neutral-20"
+        : "text-neutral-100 hover:bg-neutral-20 cursor-pointer"
     }`;
   };
 
@@ -649,7 +649,7 @@ export function useDatePickerPopover({
 
                     let dayTextClasses = "text-base font-normal";
                     let dayButtonClasses =
-                      "cursor-pointer w-10 h-6 p-2 flex justify-center items-center gap-2 rounded-lg transition-colors focus:outline-none focus:ring-1 focus:ring-primary-focus";
+                      "w-10 h-6 p-2 flex justify-center items-center gap-2 rounded-lg transition-colors focus:outline-none focus:ring-1 focus:ring-primary-focus";
 
                     if (isDisabledDay) {
                       dayTextClasses += " text-neutral-60";
@@ -662,10 +662,10 @@ export function useDatePickerPopover({
                     } else if (isCurrentDay) {
                       dayTextClasses += " text-neutral-90 font-bold";
                       dayButtonClasses +=
-                        " bg-neutral-20 hover:bg-neutral-30 outline outline-1 outline-neutral-40";
+                        " bg-neutral-20 hover:bg-neutral-30 outline outline-1 outline-neutral-40 cursor-pointer";
                     } else {
                       dayTextClasses += " text-neutral-90";
-                      dayButtonClasses += " bg-neutral-10 hover:bg-neutral-40";
+                      dayButtonClasses += " bg-neutral-10 hover:bg-neutral-40 cursor-pointer";
                     }
 
                     return (
@@ -708,16 +708,16 @@ export function useDatePickerPopover({
                   (minDate && isBefore(targetMonthEnd, minDate)) ||
                   (maxDate && isAfter(targetMonthStart, maxDate));
 
-                let monthButtonClasses = `cursor-pointer flex-1 h-10 p-2 rounded-lg flex justify-center items-center gap-2 transition-colors focus:outline-none focus:ring-1 focus:ring-primary-focus`;
+                let monthButtonClasses = `flex-1 h-10 p-2 rounded-lg flex justify-center items-center gap-2 transition-colors focus:outline-none focus:ring-1 focus:ring-primary-focus`;
                 if (isDisabledMonth) {
                   monthButtonClasses +=
                     " bg-neutral-10 text-neutral-60 hover:bg-neutral-10 cursor-default";
                 } else if (isCurrentSelectedMonth) {
                   monthButtonClasses +=
-                    " bg-primary-surface text-primary-main font-bold outline outline-1 outline-primary-border";
+                    " bg-primary-surface text-primary-main font-bold outline outline-1 outline-primary-border cursor-pointer";
                 } else {
                   monthButtonClasses +=
-                    " bg-neutral-10 text-neutral-90 hover:bg-neutral-20";
+                    " bg-neutral-10 text-neutral-90 hover:bg-neutral-20 cursor-pointer";
                 }
 
                 return (
@@ -759,7 +759,7 @@ export function useDatePickerPopover({
                   (!maxDate || year <= getYear(maxDate));
                 let isDisabled = !isCurrentDecadeYear || !isSelectableYear;
 
-                let yearButtonClasses = `cursor-pointer flex-1 h-10 p-2 rounded-lg flex justify-center items-center gap-2 transition-colors focus:outline-none focus:ring-1 focus:ring-primary-focus`;
+                let yearButtonClasses = `flex-1 h-10 p-2 rounded-lg flex justify-center items-center gap-2 transition-colors focus:outline-none focus:ring-1 focus:ring-primary-focus`;
                 let yearTextClasses = "text-center text-base";
 
                 if (!isSelectableYear) {
@@ -782,11 +782,11 @@ export function useDatePickerPopover({
                   // Current selected year
                   yearTextClasses += " text-primary-main font-bold";
                   yearButtonClasses +=
-                    " bg-primary-surface outline outline-1 outline-primary-border hover:bg-primary-surface";
+                    " bg-primary-surface outline outline-1 outline-primary-border hover:bg-primary-surface cursor-pointer";
                 } else {
                   // Default selectable year
                   yearTextClasses += " text-neutral-90";
-                  yearButtonClasses += " bg-neutral-10 hover:bg-neutral-20";
+                  yearButtonClasses += " bg-neutral-10 hover:bg-neutral-20 cursor-pointer";
                 }
 
                 return (
@@ -822,15 +822,15 @@ export function useDatePickerPopover({
                   (!minDate || decade.end >= getYear(minDate)) &&
                   (!maxDate || decade.start <= getYear(maxDate));
 
-                let decadeButtonClasses = `cursor-pointer flex-1 h-10 p-2 rounded-lg flex justify-center items-center gap-2 transition-colors focus:outline-none focus:ring-1 focus:ring-primary-focus text-center text-base `;
+                let decadeButtonClasses = `flex-1 h-10 p-2 rounded-lg flex justify-center items-center gap-2 transition-colors focus:outline-none focus:ring-1 focus:ring-primary-focus text-center text-base `;
                 let isDisabled = !isSelectableDecade;
 
                 if (isCurrentDecadeRange && isSelectableDecade) {
                   decadeButtonClasses +=
-                    " bg-primary-surface text-primary-main font-bold outline outline-1 outline-primary-border hover:bg-primary-surface";
+                    " bg-primary-surface text-primary-main font-bold outline outline-1 outline-primary-border hover:bg-primary-surface cursor-pointer";
                 } else if (isSelectableDecade) {
                   decadeButtonClasses +=
-                    " bg-neutral-10 text-neutral-90 hover:bg-neutral-20";
+                    " bg-neutral-10 text-neutral-90 hover:bg-neutral-20 cursor-pointer";
                 } else {
                   if (maxDate && decade.start > getYear(maxDate)) {
                     decadeButtonClasses +=
