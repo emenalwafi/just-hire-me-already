@@ -13,7 +13,9 @@
   },
   "dependencies": {
     "@iconscout/react-unicons": "^2.2.5",
+    "country-flag-icons": "^1.5.21",
     "date-fns": "^4.1.0",
+    "libphonenumber-js": "^1.12.25",
     "next": "16.0.0",
     "react": "19.2.0",
     "react-dom": "19.2.0"

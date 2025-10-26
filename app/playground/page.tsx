@@ -1,8 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Chip from "@/components/chip/Chip";
 import DatePicker from "@/components/date-picker/DatePicker";
+
+import {
+  useCountryPhonePopover,
+  Country,
+} from "@/hooks/country-phone-popover/useCountryPhonePopover";
+// Import the Flags object to render dynamically
+import * as Flags from "country-flag-icons/react/3x2";
+
+// Helper component to render flag dynamically based on selected country
+const DynamicFlag = ({
+  countryCode,
+  ...props
+}: {
+  countryCode: string;
+  [key: string]: any;
+}) => {
+  const Flag = Flags[countryCode.toUpperCase() as keyof typeof Flags];
+  return Flag ? <Flag {...props} /> : null; // Render null if flag component doesn't exist
+};
 
 export default function Home() {
   const [selectedChip, setSelectedChip] = useState<string | null>("rest");
@@ -13,6 +32,23 @@ export default function Home() {
   const [selectedDate3, setSelectedDate3] = useState<string | null>(
     "2022-08-20"
   ); // Example with bounds
+
+  const countryButtonRef = useRef<HTMLButtonElement>(null); // Ref for the trigger button
+  const [selectedCountry, setSelectedCountry] = useState<Country | null>(null); // State to store the selected country
+
+  // Use the custom hook
+  const {
+    isOpen: isCountryPopoverOpen,
+    setIsOpen: setCountryPopoverOpen,
+    popoverElement: countryPopoverElement,
+  } = useCountryPhonePopover({
+    anchorRef: countryButtonRef, // Pass the ref of the trigger element
+    onSelectCountry: (country) => {
+      setSelectedCountry(country); // Update state when a country is selected
+      console.log("Selected Country:", country);
+    },
+    // initialIsOpen: true // Optionally start open
+  });
 
   return (
     <div className="p-8 space-y-8">
@@ -117,6 +153,41 @@ export default function Home() {
             </p>
           </div>
         </div>
+      </section>
+
+      <section>
+        <h2 className="text-xl font-bold mb-4">Country Phone Popover Hook</h2>
+        <div className="flex items-end gap-2">
+          {/* Trigger Button */}
+          <button
+            ref={countryButtonRef} // Attach the ref here
+            type="button"
+            onClick={() => setCountryPopoverOpen(true)} // Open popover on click
+            className="inline-flex items-center gap-2 px-3 py-2 border border-neutral-40 rounded-lg hover:border-neutral-70 focus:outline-none focus:ring-2 focus:ring-primary-focus/50"
+          >
+            {selectedCountry ? (
+              <div className="w-5 h-auto overflow-hidden rounded-sm">
+                {/* Use DynamicFlag helper here */}
+                <DynamicFlag
+                  countryCode={selectedCountry.iso}
+                  title={selectedCountry.name}
+                />
+              </div>
+            ) : (
+              <span className="text-neutral-60">Select</span>
+            )}
+            <span className="text-sm">{selectedCountry?.code ?? "Code"}</span>
+          </button>
+
+          {/* Display Selected Country (Optional) */}
+          {selectedCountry && (
+            <p className="text-sm text-neutral-70">
+              Selected: {selectedCountry.name} ({selectedCountry.code})
+            </p>
+          )}
+        </div>
+        {/* Render the popover element from the hook */}
+        {countryPopoverElement}
       </section>
     </div>
   );
