@@ -208,6 +208,9 @@ export function useDatePickerPopover({
     "Dec",
   ];
 
+  /** Today's date, set to the start of the day. */
+  const today = startOfDay(new Date());
+
   // --- Date Calculations for Views ---
 
   /** Memoized 2D array of `Date` objects for the 'day' view grid. */
@@ -285,6 +288,14 @@ export function useDatePickerPopover({
   const canGoNextDecadeBlock =
     !maxDate || currentViewDecadeEnd + 100 <= getYear(maxDate);
 
+  /** Checks if the "Today" button should be disabled. */
+  const isTodayDisabled = useMemo(() => {
+    return (
+      (minDate && isBefore(today, minDate)) ||
+      (maxDate && isAfter(today, maxDate))
+    );
+  }, [today, minDate, maxDate]);
+
   // --- Click Handlers ---
 
   /** Handles selecting a day. Closes popover and sets view to 'day'. */
@@ -302,6 +313,16 @@ export function useDatePickerPopover({
     },
     [minDate, maxDate, onChange]
   );
+
+  /** Handles selecting the "Today" button. */
+  const handleTodayClick = useCallback(() => {
+    if (isTodayDisabled) return;
+
+    onChange(format(today, "yyyy-MM-dd"));
+    setIsOpen(false);
+    setView("day");
+    setCurrentDate(today); // Also reset view to today's month
+  }, [isTodayDisabled, onChange, today]);
 
   /** Handles selecting a month. Sets view to 'day'. */
   const handleMonthClick = useCallback(
@@ -843,6 +864,25 @@ export function useDatePickerPopover({
             </div>
           )}
         </div>
+
+        {/* --- Today Button Footer --- */}
+        <div className="self-stretch pt-4 border-t border-neutral-30">
+          <button
+            type="button"
+            onClick={handleTodayClick}
+            disabled={isTodayDisabled || false}
+            className="cursor-pointer w-full px-4 py-2 rounded-lg text-base font-medium transition-colors
+              disabled:bg-neutral-30 disabled:text-neutral-60 disabled:cursor-not-allowed
+              enabled:bg-primary-surface enabled:text-primary-main enabled:hover:bg-primary-hover enabled:hover:text-primary-surface enabled:focus:outline-none enabled:focus:ring-1 enabled:focus:ring-primary-focus"
+            aria-label={
+              isTodayDisabled
+                ? `Today, ${format(today, "PPP")} (not selectable)`
+                : `Select Today, ${format(today, "PPP")}`
+            }
+          >
+            Today
+          </button>
+        </div>
       </div>
     );
   }, [
@@ -853,6 +893,8 @@ export function useDatePickerPopover({
     selectedDate,
     minDate,
     maxDate,
+    today, // Add today
+    isTodayDisabled, // Add today disabled check
     calendarDays,
     calendarYears,
     calendarDecades,
@@ -869,6 +911,7 @@ export function useDatePickerPopover({
     canGoPrevDecadeBlock,
     canGoNextDecadeBlock,
     handleDayClick,
+    handleTodayClick, // Add today handler
     handleMonthClick,
     handleYearClick,
     handleDecadeClick,
