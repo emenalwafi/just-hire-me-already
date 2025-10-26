@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
-import PhoneNumberInput from "./PhoneNumberInput"; // Adjust import path
-import { Country } from "@/hooks/country-phone-popover/useCountryPhonePopover"; // Adjust import path
+import PhoneNumberInput, { PhoneNumberInputProps } from "./PhoneNumberInput";
+import { Country } from "@/hooks/country-phone-popover/useCountryPhonePopover";
 
 // --- Mocks ---
 
@@ -355,7 +355,7 @@ describe("PhoneNumberInput", () => {
     });
 
     it("should format input as user types", () => {
-      render(
+      const { rerender } = render(
         <PhoneNumberInput
           value={null}
           onChange={mockOnChange}
@@ -364,32 +364,52 @@ describe("PhoneNumberInput", () => {
       );
       const { input } = getElements();
 
+      mockOnChange.mockImplementation((newValue) => {
+        rerender(
+          <PhoneNumberInput
+            value={newValue}
+            onChange={mockOnChange}
+            selectedCountryIso="ID"
+          />
+        );
+      });
+
       act(() => {
         fireEvent.change(input, { target: { value: "8123456" } });
       });
 
-      // 1. `AsYouType` was constructed with the correct ISO
+      // 1. `AsYouType` was constructed with the correct ISO (on render and rerender)
       expect(mockAsYouType).toHaveBeenCalledWith("ID");
-      // 2. The input value is set to the (mocked) formatted number
-      expect(input.value).toBe("8123456"); // Our mock just returns the digits
-      // 3. `onChange` is called with the full international number
+      // 2. `onChange` is called with the full international number
       expect(mockOnChange).toHaveBeenCalledWith("+628123456");
+      // 3. The input value is set to the formatted number *after* rerender
+      expect(input.value).toBe("8123456"); // Our mock just returns the digits
     });
 
     it("should update country, flag, and number when selected from popover", () => {
       const mockOnCountryChange = jest.fn();
-      render(
-        <PhoneNumberInput
-          value="+628123" // Start with ID
-          onChange={mockOnChange}
-          onCountryChange={mockOnCountryChange}
-          selectedCountryIso="ID"
-        />
-      );
+
+      let props: PhoneNumberInputProps = {
+        value: "+628123", // Start with ID
+        onChange: mockOnChange,
+        onCountryChange: mockOnCountryChange,
+        selectedCountryIso: "ID",
+      };
+
+      const { rerender } = render(<PhoneNumberInput {...props} />);
+
       const { input } = getElements();
       expect(input.value).toBe("8123"); // Initial national number
       expect(screen.getByTestId("flag-ID")).toBeInTheDocument(); // Initial flag
 
+      mockOnChange.mockImplementation((newValue) => {
+        props = { ...props, value: newValue };
+        rerender(<PhoneNumberInput {...props} />);
+      });
+      mockOnCountryChange.mockImplementation((newCountry: Country) => {
+        props = { ...props, selectedCountryIso: newCountry?.iso || null };
+        rerender(<PhoneNumberInput {...props} />);
+      });
       // Simulate user selecting 'US' from the popover
       act(() => {
         // This function was captured by our hook mock
@@ -401,10 +421,15 @@ describe("PhoneNumberInput", () => {
       // Check that the flag ISO has changed
       expect(screen.getByTestId("flag-US")).toBeInTheDocument();
       expect(screen.queryByTestId("flag-ID")).not.toBeInTheDocument();
+
       // 2. `onCountryChange` prop is called
       expect(mockOnCountryChange).toHaveBeenCalledWith(mockUS);
+
       // 3. `onChange` prop is called with the *new* country code + *old* digits
       expect(mockOnChange).toHaveBeenCalledWith("+18123");
+
+      // 4. The input value reflects the national number of the new value
+      expect(input.value).toBe("8123");
     });
   });
 });

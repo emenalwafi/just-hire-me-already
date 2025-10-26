@@ -1,9 +1,4 @@
-import React, {
-  useState,
-  useRef,
-  useEffect,
-  useMemo,
-} from "react";
+import React, { useRef, useMemo, useState } from "react";
 import { UilAngleDown } from "@iconscout/react-unicons";
 import {
   useCountryPhonePopover,
@@ -29,7 +24,7 @@ const DynamicFlag = ({
   ...props
 }: {
   countryCode: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }) => {
   const Flag = Flags[countryCode.toUpperCase() as keyof typeof Flags];
   return Flag ? (
@@ -43,7 +38,7 @@ const DynamicFlag = ({
 /**
  * Props for the `PhoneNumberInput` component.
  */
-interface PhoneNumberInputProps {
+export interface PhoneNumberInputProps {
   /** The full phone number value including country code (e.g., "+6281..."). */
   value: string | null;
   /** Callback fired when the phone number changes. Returns the full number string or null. */
@@ -102,14 +97,16 @@ const PhoneNumberInput: React.FC<PhoneNumberInputProps> = ({
   const [isFocused, setIsFocused] = useState(false);
   const countries = useMemo(() => getAllCountryData(), []);
 
-  const [internalSelectedCountry, setInternalSelectedCountry] =
-    useState<Country | null>(null);
-  const [nationalNumber, setNationalNumber] = useState<string>("");
-
-  useEffect(() => {
+  // --- Refactor Start ---
+  // Instead of using useEffect to sync props to state, we derive the
+  // displayed values directly from props using useMemo.
+  // This fixes the "set-state-in-effect" error.
+  const { selectedCountry, nationalNumberToDisplay } = useMemo(() => {
     let determinedCountry: Country | null = null;
     let determinedNationalNum = "";
 
+    // 1. Determine the country
+    // Priority: Prop -> Parsed Value -> Default
     if (selectedCountryIsoProp) {
       determinedCountry =
         countries.find((c) => c.iso === selectedCountryIsoProp.toUpperCase()) ||
@@ -131,6 +128,7 @@ const PhoneNumberInput: React.FC<PhoneNumberInputProps> = ({
         null;
     }
 
+    // 2. Determine the national number to display
     if (
       value &&
       determinedCountry &&
@@ -144,20 +142,27 @@ const PhoneNumberInput: React.FC<PhoneNumberInputProps> = ({
         determinedCountry?.iso === phoneNumberInstance.country
       ) {
         determinedNationalNum = phoneNumberInstance.nationalNumber;
-      } else {
-        determinedNationalNum = "";
       }
-    } else {
-      determinedNationalNum = "";
+      // If value exists but doesn't match country, we show nothing
+      // else: determinedNationalNum = "";
     }
+    // else: determinedNationalNum = "";
 
-    if (determinedCountry?.iso !== internalSelectedCountry?.iso) {
-      setInternalSelectedCountry(determinedCountry);
-    }
-    if (determinedNationalNum !== nationalNumber) {
-      setNationalNumber(determinedNationalNum);
-    }
+    // 3. Format the national number for display
+    const formatter = new AsYouType(
+      determinedCountry?.iso as CountryCode | undefined
+    );
+    // Input the raw digits to get the formatted version
+    formatter.input(determinedNationalNum);
+    const formattedDisplayNumber =
+      formatter.getNumber()?.nationalNumber ?? determinedNationalNum;
+
+    return {
+      selectedCountry: determinedCountry,
+      nationalNumberToDisplay: formattedDisplayNumber,
+    };
   }, [value, selectedCountryIsoProp, defaultCountryIso, countries]);
+  // --- Refactor End ---
 
   const {
     isOpen: isCountryPopoverOpen,
@@ -166,20 +171,18 @@ const PhoneNumberInput: React.FC<PhoneNumberInputProps> = ({
   } = useCountryPhonePopover({
     anchorRef: triggerRef,
     onSelectCountry: (country) => {
-      const previousCountryIso = internalSelectedCountry?.iso;
-      setInternalSelectedCountry(country);
+      // Don't set internal state. Just call the prop callbacks.
+      onCountryChange?.(country);
 
-      if (country.iso !== previousCountryIso) {
-        onCountryChange?.(country);
-      }
-
-      const currentDigits = nationalNumber.replace(/\D/g, "");
+      // Get current digits from the *derived* display value
+      const currentDigits = nationalNumberToDisplay.replace(/\D/g, "");
       onChange(
         currentDigits ? `${country.code}${currentDigits}` : country.code
       );
       inputRef.current?.focus();
     },
-    selectedCountryIso: internalSelectedCountry?.iso,
+    // Use the derived selectedCountry's ISO
+    selectedCountryIso: selectedCountry?.iso,
     disabledCountryIsos: disabledCountryIsos,
   });
 
@@ -187,29 +190,25 @@ const PhoneNumberInput: React.FC<PhoneNumberInputProps> = ({
     const rawValue = e.target.value;
     const currentDigits = rawValue.replace(/\D/g, "");
 
-    const formatter = new AsYouType(
-      internalSelectedCountry?.iso as CountryCode | undefined
-    );
-    formatter.input(currentDigits);
-    const formattedDisplayNumber =
-      formatter.getNumber()?.nationalNumber ?? currentDigits;
-
-    setNationalNumber(formattedDisplayNumber);
-
+    // We don't call setNationalNumber anymore.
+    // We just report the new full value up to the parent.
     const fullNumber =
-      internalSelectedCountry && currentDigits
-        ? `${internalSelectedCountry.code}${currentDigits}`
-        : internalSelectedCountry
-        ? internalSelectedCountry.code
+      selectedCountry && currentDigits
+        ? `${selectedCountry.code}${currentDigits}`
+        : selectedCountry
+        ? selectedCountry.code
         : null;
     onChange(fullNumber);
+
+    // The component will re-render with the new `value` prop,
+    // and our `useMemo` will calculate the correctly formatted
+    // `nationalNumberToDisplay` all in a single render pass.
   };
 
   let wrapperClasses =
     "self-stretch h-10 px-4 py-2 rounded-lg outline outline-2 outline-offset-[-2px] inline-flex items-center gap-2 overflow-hidden transition-colors";
   let iconColorClass = "text-neutral-100";
   let countryCodeTextColor = "text-neutral-90";
-  let separatorColor = "outline-neutral-40";
   let placeholderColor = "text-neutral-60";
 
   if (disabled) {
@@ -261,10 +260,10 @@ const PhoneNumberInput: React.FC<PhoneNumberInputProps> = ({
               disabled ? "border-neutral-60 opacity-60" : "border-neutral-40"
             }`}
           >
-            {internalSelectedCountry ? (
+            {selectedCountry ? (
               <DynamicFlag
-                countryCode={internalSelectedCountry.iso}
-                title={internalSelectedCountry.name}
+                countryCode={selectedCountry.iso}
+                title={selectedCountry.name}
                 className="scale-200"
               />
             ) : (
@@ -276,19 +275,20 @@ const PhoneNumberInput: React.FC<PhoneNumberInputProps> = ({
 
         {/* Separator */}
         <div
-          className={`w-px h-6 rotate-0 outline outline-1 outline-offset-[-0.50px] ${separatorColor} mx-1`}
+          className={`w-px h-6 rotate-0 outline outline-1 outline-offset-[-0.50px] outline-neutral-40 mx-1`}
         ></div>
 
         {/* Country Code */}
         <div className={`justify-center text-base ${countryCodeTextColor}`}>
-          {internalSelectedCountry?.code || "+?"}
+          {selectedCountry?.code || "+?"}
         </div>
 
         {/* Phone Number Input */}
         <input
           ref={inputRef}
           type="tel"
-          value={nationalNumber}
+          // Use the derived national number
+          value={nationalNumberToDisplay}
           onChange={handlePhoneNumberChange}
           placeholder={placeholder}
           disabled={disabled}

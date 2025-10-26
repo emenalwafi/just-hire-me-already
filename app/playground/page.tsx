@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react"; // Removed useRef as it's handled within PhoneNumberInput
+import { useState } from "react"; // Removed useRef as it's handled within PhoneNumberInput
 import Chip from "@/components/chip/Chip";
 import DatePicker from "@/components/date-picker/DatePicker";
 // Import the PhoneNumberInput component
@@ -30,6 +30,18 @@ const domicileOptions: DropdownOption[] = [
   { id: "jakarta_1", label: "Jakarta Pusat - DKI Jakarta" },
   { id: "jakarta_2", label: "Jakarta Selatan - DKI Jakarta" },
 ];
+
+// --- Helper function to extract national number ---
+// Moved logic here to avoid repetition and remove manual useMemo
+function getNationalNumber(phoneNumber: string | null, iso: string | null): string {
+  if (!phoneNumber) return "";
+  const countries = getAllCountryData();
+  const country = countries.find((c) => c.iso === iso?.toUpperCase());
+  if (country && phoneNumber.startsWith(country.code)) {
+    return phoneNumber.substring(country.code.length);
+  }
+  return phoneNumber;
+}
 
 export default function Home() {
   const [selectedChip, setSelectedChip] = useState<string | null>("rest");
@@ -65,96 +77,59 @@ export default function Home() {
   const [selectedDomicile2, setSelectedDomicile2] =
     useState<DropdownOption | null>(domicileOptions[1]);
 
+  // --- Helper logic to display national number (repeated for each example) ---
+  // We call the helper function directly. The React Compiler will memoize
+  // these values automatically.
+  const nationalNumber1 = getNationalNumber(phoneNumber1, iso1);
+  const nationalNumber2 = getNationalNumber(phoneNumber2, iso2);
+  const nationalNumber3 = getNationalNumber(phoneNumber3, iso3);
+  const nationalNumber4 = getNationalNumber(phoneNumber4, iso4);
+  const nationalNumberControlled = getNationalNumber(
+    phoneNumberControlled,
+    controlledIso
+  );
+
   // --- Handlers for country change in each example ---
   const handleCountryChange1 = (country: Country | null) => {
     console.log("Country 1 Changed:", country);
     setIso1(country?.iso || null);
     // If number part is empty, update value to just the new code
-    if (!nationalNumber1) {
+    // Note: We check the *derived* national number here
+    if (!getNationalNumber(phoneNumber1, country?.iso || null)) {
       setPhoneNumber1(country?.code || null);
     }
   };
   const handleCountryChange2 = (country: Country | null) => {
     console.log("Country 2 Changed:", country);
     setIso2(country?.iso || null);
-    if (!nationalNumber2) {
+    if (!getNationalNumber(phoneNumber2, country?.iso || null)) {
       setPhoneNumber2(country?.code || null);
     }
   };
   const handleCountryChange3 = (country: Country | null) => {
     console.log("Country 3 Changed:", country);
     setIso3(country?.iso || null);
-    if (!nationalNumber3) {
+    if (!getNationalNumber(phoneNumber3, country?.iso || null)) {
       setPhoneNumber3(country?.code || null);
     }
   };
   const handleCountryChange4 = (country: Country | null) => {
     console.log("Country 4 Changed:", country);
     setIso4(country?.iso || null);
-    if (!nationalNumber4) {
+    if (!getNationalNumber(phoneNumber4, country?.iso || null)) {
       setPhoneNumber4(country?.code || null);
     }
   };
   const handleCountryChangeControlled = (country: Country | null) => {
     console.log("Country Controlled Changed:", country);
     setControlledIso(country?.iso || null);
-    if (!nationalNumberControlled) {
+    if (!getNationalNumber(phoneNumberControlled, country?.iso || null)) {
       setPhoneNumberControlled(country?.code || null);
     }
   };
 
-  // --- Helper logic to display national number (repeated for each example) ---
-  const nationalNumber1 = useMemo(() => {
-    if (!phoneNumber1) return "";
-    const countries = getAllCountryData();
-    const country = countries.find((c) => c.iso === iso1?.toUpperCase());
-    if (country && phoneNumber1.startsWith(country.code)) {
-      return phoneNumber1.substring(country.code.length);
-    }
-    return phoneNumber1;
-  }, [phoneNumber1, iso1]);
-
-  const nationalNumber2 = useMemo(() => {
-    if (!phoneNumber2) return "";
-    const countries = getAllCountryData();
-    const country = countries.find((c) => c.iso === iso2?.toUpperCase());
-    if (country && phoneNumber2.startsWith(country.code)) {
-      return phoneNumber2.substring(country.code.length);
-    }
-    return phoneNumber2;
-  }, [phoneNumber2, iso2]);
-
-  const nationalNumber3 = useMemo(() => {
-    if (!phoneNumber3) return "";
-    const countries = getAllCountryData();
-    const country = countries.find((c) => c.iso === iso3?.toUpperCase());
-    if (country && phoneNumber3.startsWith(country.code)) {
-      return phoneNumber3.substring(country.code.length);
-    }
-    return phoneNumber3;
-  }, [phoneNumber3, iso3]);
-
-  const nationalNumber4 = useMemo(() => {
-    if (!phoneNumber4) return "";
-    const countries = getAllCountryData();
-    const country = countries.find((c) => c.iso === iso4?.toUpperCase());
-    if (country && phoneNumber4.startsWith(country.code)) {
-      return phoneNumber4.substring(country.code.length);
-    }
-    return phoneNumber4;
-  }, [phoneNumber4, iso4]);
-
-  const nationalNumberControlled = useMemo(() => {
-    if (!phoneNumberControlled) return "";
-    const countries = getAllCountryData();
-    const country = countries.find(
-      (c) => c.iso === controlledIso?.toUpperCase()
-    );
-    if (country && phoneNumberControlled.startsWith(country.code)) {
-      return phoneNumberControlled.substring(country.code.length);
-    }
-    return phoneNumberControlled;
-  }, [phoneNumberControlled, controlledIso]);
+  // Removed all the repetitive useMemo blocks for nationalNumber 1-5
+  // They are now simple const declarations above, using the helper function.
 
   return (
     <div className="p-8 space-y-8">

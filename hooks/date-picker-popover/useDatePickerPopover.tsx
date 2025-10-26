@@ -145,16 +145,20 @@ export function useDatePickerPopover({
   }, [selectedDate, minDate, maxDate]);
 
   /** State for the date the calendar is currently displaying (e.g., the month/year being viewed). */
-  const [currentDate, setCurrentDate] = useState(getBoundedInitialDate());
+  const [currentDate, setCurrentDate] = useState(getBoundedInitialDate);
   /** State for the current calendar view ('day', 'month', 'year', 'decade'). */
   const [view, setView] = useState<"day" | "month" | "year" | "decade">("day");
 
-  // --- Effects ---
+  const [prevGetBoundedInitialDate, setPrevGetBoundedInitialDate] = useState(
+    () => getBoundedInitialDate
+  );
 
-  /** Effect to reset the `currentDate` if min/max boundaries change. */
-  useEffect(() => {
+  if (getBoundedInitialDate !== prevGetBoundedInitialDate) {
     setCurrentDate(getBoundedInitialDate());
-  }, [minDate, maxDate, getBoundedInitialDate]);
+    setPrevGetBoundedInitialDate(() => getBoundedInitialDate);
+  }
+
+  // --- Effects ---
 
   /** Effect to calculate and set the popover's position when it opens. */
   useEffect(() => {
@@ -191,22 +195,25 @@ export function useDatePickerPopover({
   // --- Constants ---
 
   /** Abbreviated days of the week for the calendar header. */
-  const daysOfWeek = ["S", "M", "T", "W", "T", "F", "S"];
+  const daysOfWeek = useMemo(() => ["S", "M", "T", "W", "T", "F", "S"], []);
   /** Abbreviated months of the year for the month view. */
-  const monthsOfYear = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
+  const monthsOfYear = useMemo(
+    () => [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ],
+    []
+  );
 
   /** Today's date, set to the start of the day. */
   const today = startOfDay(new Date());
@@ -758,7 +765,7 @@ export function useDatePickerPopover({
                 const isSelectableYear =
                   (!minDate || year >= getYear(minDate)) &&
                   (!maxDate || year <= getYear(maxDate));
-                let isDisabled = !isCurrentDecadeYear || !isSelectableYear;
+                const isDisabled = !isCurrentDecadeYear || !isSelectableYear;
 
                 let yearButtonClasses = `flex-1 h-10 p-2 rounded-lg flex justify-center items-center gap-2 transition-colors focus:outline-none focus:ring-1 focus:ring-primary-focus`;
                 let yearTextClasses = "text-center text-base";
@@ -895,9 +902,11 @@ export function useDatePickerPopover({
     selectedDate,
     minDate,
     maxDate,
-    today, // Add today
-    isTodayDisabled, // Add today disabled check
+    today,
+    isTodayDisabled,
     calendarDays,
+    daysOfWeek,
+    monthsOfYear,
     calendarYears,
     calendarDecades,
     currentViewDecadeStart,
@@ -913,7 +922,7 @@ export function useDatePickerPopover({
     canGoPrevDecadeBlock,
     canGoNextDecadeBlock,
     handleDayClick,
-    handleTodayClick, // Add today handler
+    handleTodayClick,
     handleMonthClick,
     handleYearClick,
     handleDecadeClick,

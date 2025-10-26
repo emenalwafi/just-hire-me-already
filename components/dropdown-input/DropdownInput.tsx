@@ -1,6 +1,9 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef } from "react";
 import { UilAngleDown } from "@iconscout/react-unicons";
-import { useDropdownPopover, DropdownOption } from "@/hooks/dropdown-popover/useDropdownPopover"; // Assuming hook is in hooks folder
+import {
+  useDropdownPopover,
+  DropdownOption,
+} from "@/hooks/dropdown-popover/useDropdownPopover"; // Assuming hook is in hooks folder
 
 interface DropdownInputProps {
   /** The currently selected option object, or null */
@@ -44,9 +47,7 @@ const DropdownInput: React.FC<DropdownInputProps> = ({
   const isSelectionInProgress = useRef(false); // Flag to prevent blur handler from reverting during selection
 
   // Sync input value if the external value prop changes
-  useEffect(() => {
-    setInputValue(value ? value.label : "");
-  }, [value]);
+  const displayValue = isFocused ? inputValue : value ? value.label : "";
 
   // Use the custom hook for the popover
   const { popoverElement } = useDropdownPopover({
@@ -76,15 +77,13 @@ const DropdownInput: React.FC<DropdownInputProps> = ({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
-    setIsOpen(true); // Open the popover when user types
-    // Clear external selection if input doesn't match any option label exactly (optional behavior)
-    // Or maybe just let the filtering happen and don't change external state until selection
-    // Let's stick with just filtering for now.
+    setIsOpen(true); // Open the popover when user types.
   };
 
   const handleInputFocus = () => {
     if (!disabled) {
       setIsFocused(true);
+      setInputValue(value ? value.label : "");
       setIsOpen(true); // Open popover on focus
     }
   };
@@ -96,14 +95,7 @@ const DropdownInput: React.FC<DropdownInputProps> = ({
         // Check isOpen and the flag
         setIsFocused(false);
         // Revert input value if it doesn't match the selected value's label
-        if (value && inputValue !== value.label) {
-          setInputValue(value.label);
-        } else if (!value && inputValue !== "") {
-          // If no value is selected externally, clear the input if it has text
-          // setInputValue(""); // Optional: clear if nothing selected
-          // OR revert to placeholder logic? Let's just revert to selected value for now.
-          setInputValue(""); // Clear if nothing selected
-        }
+        setInputValue("");
       }
     }, 150); // Adjust timeout as needed
   };
@@ -157,12 +149,14 @@ const DropdownInput: React.FC<DropdownInputProps> = ({
       {/* Container div now primarily for layout and focus/blur capture */}
       <div
         ref={triggerRef}
-        className={`${wrapperClasses} ${caretColorClass}`} // Apply caret color to container
-        // Remove direct onClick handler, focus/typing opens popover
-        // Can add onClick to maybe re-focus input if needed: onClick={() => inputRef.current?.focus()}
-        tabIndex={-1} // Remove focusability from outer div
-        // Use onFocusCapture/onBlurCapture to detect focus entering/leaving the entire component
-        onFocusCapture={() => !disabled && setIsFocused(true)}
+        className={`${wrapperClasses} ${caretColorClass}`}
+        onClick={() => {
+          if (!disabled && inputRef.current) {
+            handleInputFocus();
+            inputRef.current.focus();
+          }
+        }}
+        tabIndex={-1}
         onBlurCapture={(e) => {
           // Check if the related target (where focus is going) is still inside this component OR the popover
           const popoverElementCheck = document.getElementById(
@@ -184,7 +178,7 @@ const DropdownInput: React.FC<DropdownInputProps> = ({
           ref={inputRef}
           type="text"
           // Removed readOnly
-          value={inputValue} // Use local state for input value
+          value={displayValue} // Use the derived displayValue
           onChange={handleInputChange} // Update local state on change
           onFocus={handleInputFocus} // Handle focus event
           // onBlur={handleBlur} // Use capture on parent instead
@@ -204,7 +198,19 @@ const DropdownInput: React.FC<DropdownInputProps> = ({
         {/* Make icon clickable to toggle dropdown */}
         <button
           type="button"
-          onClick={() => !disabled && setIsOpen(!isOpen)}
+          onClick={(e) => {
+            // Stop propagation to prevent the div's onClick from re-focusing
+            e.stopPropagation();
+            if (disabled) return;
+            if (isOpen) {
+              setIsOpen(false);
+              inputRef.current?.blur(); // Explicitly blur
+            } else {
+              // Call state update function *and* native focus
+              handleInputFocus();
+              inputRef.current?.focus(); // This will trigger handleInputFocus
+            }
+          }}
           disabled={disabled}
           className={`focus:outline-none ${
             disabled ? "cursor-not-allowed" : "cursor-pointer"

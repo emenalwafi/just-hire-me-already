@@ -51,7 +51,7 @@ export const getAllCountryData = (): Country[] => {
         });
       }
     } catch (error) {
-      // Silently ignore errors for codes that fail (e.g., '001')
+      console.warn(error);
     }
   });
 
@@ -106,7 +106,7 @@ const DynamicFlag = ({
   ...props
 }: {
   countryCode: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }) => {
   const Flag = Flags[countryCode.toUpperCase() as keyof typeof Flags];
   return Flag ? (

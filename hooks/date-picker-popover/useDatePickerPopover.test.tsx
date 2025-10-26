@@ -614,7 +614,7 @@ describe("useDatePickerPopover", () => {
     });
 
     it("should update currentDate if minDate prop changes", () => {
-      const triggerRef = { current: document.createElement("button") } as any;
+      const triggerRef = { current: document.createElement("button") };
       const { rerender, result } = renderHook(
         (p: UseDatePickerPopoverProps) => useDatePickerPopover(p),
         {
