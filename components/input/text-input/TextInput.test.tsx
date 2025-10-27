@@ -1,7 +1,6 @@
-import React from "react";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
-import TextInput from "./TextInput"; // Adjust import path as needed
+import TextInput from "./TextInput";
 
 /**
  * @file Test suite for the TextInput component.

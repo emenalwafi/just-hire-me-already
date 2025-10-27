@@ -1,7 +1,7 @@
 "use client";
 
 import { ColumnDef, createColumnHelper } from "@tanstack/react-table";
-import { CheckboxInput } from "@/components/input/checkbox-input/CheckboxInput"; // Adjust path as needed
+import { CheckboxInput } from "@/components/input/checkbox-input/CheckboxInput";
 
 // Data extracted from your HTML
 export const defaultData: Person[] = [
@@ -260,6 +260,7 @@ export type Person = {
 const columnHelper = createColumnHelper<Person>();
 
 // --- Column Definitions ---
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const columns: ColumnDef<Person, any>[] = [
   // Select Column (Pinned)
   columnHelper.display({

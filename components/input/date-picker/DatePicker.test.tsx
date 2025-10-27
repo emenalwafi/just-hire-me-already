@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
-import DatePicker from "./DatePicker"; // Adjust this import path as needed
-import { useDatePickerPopover } from "@/hooks/date-picker-popover/useDatePickerPopover"; // Adjust this import path as needed
+import DatePicker from "./DatePicker";
+import { useDatePickerPopover } from "@/hooks/date-picker-popover/useDatePickerPopover";
 
 /**
  * @file Test suite for the DatePicker component.

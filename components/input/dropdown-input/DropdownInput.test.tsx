@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
-import DropdownInput from "./DropdownInput"; // Adjust import path
-import { DropdownOption } from "@/hooks/dropdown-popover/useDropdownPopover"; // Adjust import path
+import DropdownInput from "./DropdownInput";
+import { DropdownOption } from "@/hooks/dropdown-popover/useDropdownPopover";
 
 /**
  * @file Test suite for the DropdownInput (Combobox) component.

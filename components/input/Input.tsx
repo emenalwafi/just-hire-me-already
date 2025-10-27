@@ -20,7 +20,7 @@ import {
   PhoneValue,
   PhoneOnChange,
   PhoneCountryChange,
-} from "@/types/InputConfig"; // Adjust path as needed
+} from "@/types/InputConfig";
 
 /**
  * Props for the unified `Input` component.

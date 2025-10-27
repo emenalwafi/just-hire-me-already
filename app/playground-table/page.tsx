@@ -3,7 +3,7 @@
 import { ColumnPinningState } from "@tanstack/react-table";
 
 // 1. Import the generic table component
-import { DataTable } from "@/components/data-table/DataTable"; // Adjust path as needed
+import { DataTable } from "@/components/data-table/DataTable";
 
 import { columns, defaultData, Person } from "./columns";
 
@@ -23,7 +23,7 @@ export default function CandidatesPage() {
       {/* 4. Render the generic table, passing in the
            data, columns, and settings.
       */}
-      <DataTable<Person, any>
+      <DataTable<Person, unknown>
         columns={columns}
         data={data}
         initialPinning={initialPinning}

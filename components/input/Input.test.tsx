@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
-import Input from "./Input"; // Adjust import path
+import Input from "./Input";
 import {
   DatePickerConfig,
   DropdownInputConfig,
@@ -9,7 +9,7 @@ import {
   PhoneNumberInputConfig,
   RadioInputConfig,
   TextInputConfig,
-} from "@/types/InputConfig"; // Adjust path as needed
+} from "@/types/InputConfig";
 import { DropdownOption } from "@/hooks/dropdown-popover/useDropdownPopover";
 import { RadioOption } from "@/components/input/radio-input/RadioInput";
 

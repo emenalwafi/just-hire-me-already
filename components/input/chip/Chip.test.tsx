@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom"; // Imports custom matchers like .toHaveClass()
-import Chip from "./Chip"; // Adjust the import path as needed
+import Chip from "./Chip";
 
 /**
  * @file Test suite for the Chip component.

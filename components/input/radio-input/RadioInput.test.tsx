@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
-import RadioInput from "./RadioInput"; // Adjust import path
-import { RadioOption } from "./RadioInput"; // Adjust import path
+import RadioInput from "./RadioInput";
+import { RadioOption } from "./RadioInput";
 
 /**
  * @file Test suite for the RadioInput component.

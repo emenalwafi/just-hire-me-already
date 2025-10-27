@@ -5,7 +5,7 @@ import "@testing-library/jest-dom";
 import {
   useDatePickerPopover,
   UseDatePickerPopoverProps,
-} from "./useDatePickerPopover"; // Adjust import path
+} from "./useDatePickerPopover";
 import { format, parseISO, startOfDay } from "date-fns";
 
 /**
