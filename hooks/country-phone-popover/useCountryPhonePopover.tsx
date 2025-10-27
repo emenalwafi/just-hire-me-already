@@ -147,6 +147,7 @@ export function useCountryPhonePopover({
   const [popoverPosition, setPopoverPosition] = useState<{
     top: number;
     left: number;
+    width: number;
   } | null>(null);
 
   /** Memoized list of countries filtered by the `searchTerm`. */
@@ -166,11 +167,12 @@ export function useCountryPhonePopover({
 
   /** Effect to calculate the popover's position when it opens or the anchor moves. */
   useEffect(() => {
-    if (isOpen && anchorRef.current) {
-      const rect = anchorRef.current.getBoundingClientRect();
+    if (isOpen && anchorRef.current && anchorRef.current.parentElement) {
+      const rect = anchorRef.current.parentElement.getBoundingClientRect();
       setPopoverPosition({
         top: rect.bottom + window.scrollY + 8, // Position 8px below the anchor
         left: rect.left + window.scrollX,
+        width: rect.width,
       });
     } else {
       setPopoverPosition(null);
@@ -231,9 +233,10 @@ export function useCountryPhonePopover({
           position: "absolute",
           top: `${popoverPosition.top}px`,
           left: `${popoverPosition.left}px`,
+          width: `${popoverPosition.width}px`,
           zIndex: 50,
         }}
-        className="w-80 py-2 bg-neutral-10 rounded-lg shadow-[0px_4px_8px_0px_rgba(0,0,0,0.10)] outline outline-1 outline-offset-[-1px] outline-neutral-40 inline-flex flex-col justify-start items-start overflow-hidden font-sans"
+        className="py-2 bg-neutral-10 rounded-lg shadow-[0px_4px_8px_0px_rgba(0,0,0,0.10)] outline outline-1 outline-offset-[-1px] outline-neutral-40 inline-flex flex-col justify-start items-start overflow-hidden font-sans"
         onKeyDown={(e) => e.key === "Escape" && handleClose()}
       >
         {/* Search Input */}

@@ -4,6 +4,8 @@ import React, {
   useRef,
   useEffect,
   useCallback,
+  useLayoutEffect,
+  CSSProperties,
 } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -80,10 +82,10 @@ export interface UseDatePickerPopoverReturn {
 /**
  * A custom hook to manage the state, logic, and rendering of a date picker popover.
  * It handles date calculations, view navigation (day, month, year, decade),
- * and popover positioning.
+ * and responsive popover/modal positioning.
  *
  * @param {UseDatePickerPopoverProps} props - The props for the hook.
- * @returns {UseDatePickerPopoverReturn} - The state and elements to control the date picker.
+ *@returns {UseDatePickerPopoverReturn} - The state and elements to control the date picker.
  */
 export function useDatePickerPopover({
   value,
@@ -112,15 +114,19 @@ export function useDatePickerPopover({
 
   /** State for controlling the popover's visibility. */
   const [isOpen, setIsOpen] = useState(false);
-  /** Ref for the popover `div` element, used for click-outside detection. */
+  /** Ref for the popover `div` element, used for click-outside detection and positioning. */
   const popoverRef = useRef<HTMLDivElement>(null);
   /** Ref for the main component wrapper `div` element, used for click-outside detection. */
   const containerRef = useRef<HTMLDivElement>(null);
-  /** State for the popover's absolute position (top, left). */
+
+  /** State for the popover's absolute position (top, left). Null on mobile. */
   const [popoverPosition, setPopoverPosition] = useState<{
     top: number;
     left: number;
   } | null>(null);
+
+  /** State for mobile detection. */
+  const [isMobile, setIsMobile] = useState(false);
 
   /** Memoized `Date` object for the selected `value`, bounded by min/max dates. */
   const selectedDate = useMemo(() => {
@@ -160,37 +166,101 @@ export function useDatePickerPopover({
 
   // --- Effects ---
 
-  /** Effect to calculate and set the popover's position when it opens. */
+  /** Effect to check for mobile viewport on resize. */
   useEffect(() => {
-    if (isOpen && triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect();
-      setPopoverPosition({
-        top: rect.bottom + window.scrollY + 8, // 8px gap
-        left: rect.left + window.scrollX,
-      });
-    } else {
-      setPopoverPosition(null);
-    }
-  }, [isOpen, triggerRef]);
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 480);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
-  /** Effect to handle clicks outside the popover and trigger to close it. */
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        isOpen &&
-        triggerRef.current &&
-        !triggerRef.current.contains(event.target as Node) &&
-        popoverRef.current &&
-        !popoverRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
+  /**
+   * Effect to handle responsive positioning and visibility.
+   * This MUST be a `useLayoutEffect` because it reads from the DOM (getBoundingClientRect)
+   * and then synchronously updates state (setPopoverPosition) before the browser paints
+   * to avoid flickering.
+   *
+   * This effect handles all logic for opening, closing, mobile, and desktop positioning.
+   */
+  useLayoutEffect(() => {
+    const checkPopover = (
+      value: {
+        top: number;
+        left: number;
+      } | null
+    ) => {
+      setPopoverPosition(value);
+    };
+
+    // 1. Handle the "closed" state
+    if (!isOpen) {
+      return;
+    }
+
+    // 2. Handle the "open" state on mobile
+    if (isMobile) {
+      checkPopover(null);
+      return;
+    }
+
+    // 3. Handle the "open" state on desktop
+    // This requires a two-step render-measure-re-render
+
+    // Check if refs are available for measurement
+    if (!isMobile && popoverRef.current && triggerRef.current) {
+      const popoverRect = popoverRef.current.getBoundingClientRect();
+      const triggerRect = triggerRef.current.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const gap = 8;
+
+      let newTop: number;
+      let newLeft: number;
+
+      // --- Calculate Vertical Position ---
+      const spaceBelow = vh - triggerRect.bottom;
+      const spaceAbove = triggerRect.top;
+
+      if (spaceBelow >= popoverRect.height + gap) {
+        // Enough space below
+        newTop = triggerRect.bottom + gap + window.scrollY;
+      } else if (spaceAbove >= popoverRect.height + gap) {
+        // Enough space above
+        newTop = triggerRect.top - popoverRect.height - gap + window.scrollY;
+      } else {
+        // Not enough space either way, clamp to viewport (prefer below)
+        newTop = Math.max(
+          gap + window.scrollY,
+          vh - popoverRect.height - gap + window.scrollY
+        );
       }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [isOpen, triggerRef, popoverRef]);
+
+      // --- Calculate Horizontal Position ---
+      const spaceRight = vw - triggerRect.left;
+
+      if (spaceRight >= popoverRect.width + gap) {
+        // Enough space to the right (default left-align)
+        newLeft = triggerRect.left + window.scrollX;
+      } else {
+        // Not enough space, right-align to trigger
+        newLeft = triggerRect.right - popoverRect.width + window.scrollX;
+      }
+
+      // --- Clamp to Viewport ---
+      // Clamp left
+      newLeft = Math.max(gap + window.scrollX, newLeft);
+      // Clamp right
+      if (newLeft + popoverRect.width + gap > vw + window.scrollX) {
+        newLeft = vw - popoverRect.width - gap + window.scrollX;
+      }
+
+      checkPopover({ top: newTop, left: newLeft });
+    } else if (!isMobile) {
+      checkPopover({ top: 0, left: 0 });
+    }
+  }, [isOpen, isMobile, popoverRef, triggerRef]);
 
   // --- Constants ---
 
@@ -304,6 +374,28 @@ export function useDatePickerPopover({
   }, [today, minDate, maxDate]);
 
   // --- Click Handlers ---
+  const closePopover = useCallback(() => {
+    setIsOpen(false);
+    setPopoverPosition(null);
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        isOpen &&
+        triggerRef.current &&
+        !triggerRef.current.contains(event.target as Node) &&
+        popoverRef.current &&
+        !popoverRef.current.contains(event.target as Node)
+      ) {
+        closePopover();
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isOpen, triggerRef, popoverRef, closePopover]);
 
   /** Handles selecting a day. Closes popover and sets view to 'day'. */
   const handleDayClick = useCallback(
@@ -314,11 +406,11 @@ export function useDatePickerPopover({
         (!maxDate || !isAfter(dayStart, maxDate))
       ) {
         onChange(format(day, "yyyy-MM-dd"));
-        setIsOpen(false);
+        closePopover();
         setView("day");
       }
     },
-    [minDate, maxDate, onChange]
+    [minDate, maxDate, onChange, closePopover]
   );
 
   /** Handles selecting the "Today" button. */
@@ -326,10 +418,10 @@ export function useDatePickerPopover({
     if (isTodayDisabled) return;
 
     onChange(format(today, "yyyy-MM-dd"));
-    setIsOpen(false);
+    closePopover();
     setView("day");
     setCurrentDate(today); // Also reset view to today's month
-  }, [isTodayDisabled, onChange, today]);
+  }, [isTodayDisabled, onChange, today, closePopover]);
 
   /** Handles selecting a month. Sets view to 'day'. */
   const handleMonthClick = useCallback(
@@ -447,87 +539,115 @@ export function useDatePickerPopover({
 
   /** Memoized JSX for the popover's content. */
   const popoverElementInternal = useMemo(() => {
-    if (!isOpen || !popoverPosition) return null;
+    if (!isOpen) return null;
+
+    // --- Define Content ---
+    // This is the inner content, which is the same for mobile and desktop
+
+    const mobileClass = isMobile
+      ? "fixed inset-0 bg-black/50 z-40 flex justify-center items-center p-4"
+      : "";
+
+    const popoverStyle: CSSProperties = {
+      zIndex: 50,
+    };
+
+    if (!isMobile && popoverPosition) {
+      popoverStyle.position = "absolute";
+      popoverStyle.top = `${popoverPosition.top}px`;
+      popoverStyle.left = `${popoverPosition.left}px`;
+    }
 
     return (
-      <div
-        ref={popoverRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Date Picker"
-        style={{
-          position: "absolute",
-          top: `${popoverPosition.top}px`,
-          left: `${popoverPosition.left}px`,
-          zIndex: 50,
-        }}
-        className="w-96 p-6 bg-neutral-10 rounded-2xl shadow-[0px_4px_8px_0px_rgba(0,0,0,0.10)] outline outline-1 outline-offset[-1px] outline-neutral-40 inline-flex flex-col justify-start items-start gap-6 font-sans"
-        onKeyDown={(e) => e.key === "Escape" && setIsOpen(false)}
-      >
-        {/* Calendar Header */}
-        <div className="self-stretch inline-flex justify-between items-center">
-          {/* Previous */}
-          <div className="flex justify-end items-center gap-1">
-            <button
-              type="button"
-              onClick={
-                view === "decade"
-                  ? goToPrevDecadeBlock
-                  : view === "year"
-                  ? goToPrevDecade
-                  : goToPrevYear
-              }
-              disabled={
-                (view === "decade" && !canGoPrevDecadeBlock) ||
-                (view === "year" && !canGoPrevDecade) ||
-                ((view === "day" || view === "month") && !canGoPrevYear)
-              }
-              className={getNavButtonClasses(
-                (view === "decade" && !canGoPrevDecadeBlock) ||
-                  (view === "year" && !canGoPrevDecade) ||
-                  ((view === "day" || view === "month") && !canGoPrevYear)
-              )}
-              aria-label={
-                view === "decade"
-                  ? "Previous 100 years"
-                  : view === "year"
-                  ? "Previous decade"
-                  : "Previous year"
-              }
-            >
-              {" "}
-              <UilAngleDoubleLeft size="24" />{" "}
-            </button>
-            {view === "day" && (
+      <div className={mobileClass}>
+        <div
+          ref={popoverRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Date Picker"
+          style={popoverStyle}
+          className="w-96 p-6 bg-neutral-10 rounded-2xl shadow-[0px_4px_8px_0px_rgba(0,0,0,0.10)] outline outline-1 outline-offset[-1px] outline-neutral-40 inline-flex flex-col justify-start items-start gap-6 font-sans"
+          onKeyDown={(e) => e.key === "Escape" && setIsOpen(false)}
+        >
+          {/* Calendar Header */}
+          <div className="self-stretch inline-flex justify-between items-center">
+            {/* Previous */}
+            <div className="flex justify-end items-center gap-1">
               <button
                 type="button"
-                onClick={goToPrevMonth}
-                disabled={!canGoPrevMonth}
-                className={getNavButtonClasses(!canGoPrevMonth)}
-                aria-label="Previous month"
+                onClick={
+                  view === "decade"
+                    ? goToPrevDecadeBlock
+                    : view === "year"
+                    ? goToPrevDecade
+                    : goToPrevYear
+                }
+                disabled={
+                  (view === "decade" && !canGoPrevDecadeBlock) ||
+                  (view === "year" && !canGoPrevDecade) ||
+                  ((view === "day" || view === "month") && !canGoPrevYear)
+                }
+                className={getNavButtonClasses(
+                  (view === "decade" && !canGoPrevDecadeBlock) ||
+                    (view === "year" && !canGoPrevDecade) ||
+                    ((view === "day" || view === "month") && !canGoPrevYear)
+                )}
+                aria-label={
+                  view === "decade"
+                    ? "Previous 100 years"
+                    : view === "year"
+                    ? "Previous decade"
+                    : "Previous year"
+                }
               >
                 {" "}
-                <UilAngleLeft size="24" />{" "}
+                <UilAngleDoubleLeft size="24" />{" "}
               </button>
-            )}
-          </div>
-          {/* Title */}
-          <div className="flex justify-start items-center gap-4">
-            {view === "day" && (
-              <>
-                {" "}
+              {view === "day" && (
                 <button
                   type="button"
-                  onClick={() => setView("month")}
-                  className="cursor-pointer justify-start text-neutral-90 text-lg font-bold hover:text-primary-main focus:outline-none focus:ring-1 focus:ring-primary-focus rounded px-1"
-                  aria-label={`Select month for year ${format(
-                    currentDate,
-                    "yyyy"
-                  )}`}
+                  onClick={goToPrevMonth}
+                  disabled={!canGoPrevMonth}
+                  className={getNavButtonClasses(!canGoPrevMonth)}
+                  aria-label="Previous month"
                 >
                   {" "}
-                  {format(currentDate, "MMM")}{" "}
-                </button>{" "}
+                  <UilAngleLeft size="24" />{" "}
+                </button>
+              )}
+            </div>
+            {/* Title */}
+            <div className="flex justify-start items-center gap-4">
+              {view === "day" && (
+                <>
+                  {" "}
+                  <button
+                    type="button"
+                    onClick={() => setView("month")}
+                    className="cursor-pointer justify-start text-neutral-90 text-lg font-bold hover:text-primary-main focus:outline-none focus:ring-1 focus:ring-primary-focus rounded px-1"
+                    aria-label={`Select month for year ${format(
+                      currentDate,
+                      "yyyy"
+                    )}`}
+                  >
+                    {" "}
+                    {format(currentDate, "MMM")}{" "}
+                  </button>{" "}
+                  <button
+                    type="button"
+                    onClick={() => setView("year")}
+                    className="cursor-pointer justify-start text-neutral-90 text-lg font-bold hover:text-primary-main focus:outline-none focus:ring-1 focus:ring-primary-focus rounded px-1"
+                    aria-label={`Current year ${format(
+                      currentDate,
+                      "yyyy"
+                    )}, select year`}
+                  >
+                    {" "}
+                    {format(currentDate, "yyyy")}{" "}
+                  </button>{" "}
+                </>
+              )}
+              {view === "month" && (
                 <button
                   type="button"
                   onClick={() => setView("year")}
@@ -539,358 +659,344 @@ export function useDatePickerPopover({
                 >
                   {" "}
                   {format(currentDate, "yyyy")}{" "}
-                </button>{" "}
-              </>
-            )}
-            {view === "month" && (
-              <button
-                type="button"
-                onClick={() => setView("year")}
-                className="cursor-pointer justify-start text-neutral-90 text-lg font-bold hover:text-primary-main focus:outline-none focus:ring-1 focus:ring-primary-focus rounded px-1"
-                aria-label={`Current year ${format(
-                  currentDate,
-                  "yyyy"
-                )}, select year`}
-              >
-                {" "}
-                {format(currentDate, "yyyy")}{" "}
-              </button>
-            )}
-            {view === "year" && (
-              <button
-                type="button"
-                onClick={() => setView("decade")}
-                className="cursor-pointer justify-start text-neutral-90 text-lg font-bold hover:text-primary-main focus:outline-none focus:ring-1 focus:ring-primary-focus rounded px-1"
-                aria-label={`Current decade ${currentViewDecadeStart}-${currentViewDecadeEnd}, select decade range`}
-              >
-                {" "}
-                {`${currentViewDecadeStart} - ${currentViewDecadeEnd}`}{" "}
-              </button>
-            )}
-            {view === "decade" && (
-              <div className="justify-start text-neutral-90 text-lg font-bold">{`${decadeViewHeaderStart} - ${decadeViewHeaderEnd}`}</div>
-            )}
-          </div>
-          {/* Next */}
-          <div className="flex justify-end items-center gap-1">
-            {view === "day" && (
-              <button
-                type="button"
-                onClick={goToNextMonth}
-                disabled={!canGoNextMonth}
-                className={getNavButtonClasses(!canGoNextMonth)}
-                aria-label="Next month"
-              >
-                {" "}
-                <UilAngleRight size="24" />{" "}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={
-                view === "decade"
-                  ? goToNextDecadeBlock
-                  : view === "year"
-                  ? goToNextDecade
-                  : goToNextYear
-              }
-              disabled={
-                (view === "decade" && !canGoNextDecadeBlock) ||
-                (view === "year" && !canGoNextDecade) ||
-                ((view === "day" || view === "month") && !canGoNextYear)
-              }
-              className={getNavButtonClasses(
-                (view === "decade" && !canGoNextDecadeBlock) ||
-                  (view === "year" && !canGoNextDecade) ||
-                  ((view === "day" || view === "month") && !canGoNextYear)
+                </button>
               )}
-              aria-label={
-                view === "decade"
-                  ? "Next 100 years"
-                  : view === "year"
-                  ? "Next decade"
-                  : "Next year"
-              }
-            >
-              {" "}
-              <UilAngleDoubleRight size="24" />{" "}
-            </button>
-          </div>
-        </div>
-
-        {/* Calendar Grid */}
-        <div className="self-stretch flex flex-col justify-start items-start gap-2">
-          {/* Day View */}
-          {view === "day" && (
-            <>
-              {" "}
-              <div className="self-stretch inline-flex justify-start items-start gap-2">
-                {" "}
-                {daysOfWeek.map((day, index) => (
-                  <div
-                    key={`${day}-${index}`}
-                    className="flex-1 text-center justify-start text-neutral-100 text-base font-bold"
-                    aria-hidden="true"
-                  >
-                    {day}
-                  </div>
-                ))}
-                <div className="w-0"></div>
-              </div>{" "}
-              {calendarDays.map((row, rowIndex) => (
-                <div
-                  key={rowIndex}
-                  className="self-stretch inline-flex justify-start items-start gap-2"
+              {view === "year" && (
+                <button
+                  type="button"
+                  onClick={() => setView("decade")}
+                  className="cursor-pointer justify-start text-neutral-90 text-lg font-bold hover:text-primary-main focus:outline-none focus:ring-1 focus:ring-primary-focus rounded px-1"
+                  aria-label={`Current decade ${currentViewDecadeStart}-${currentViewDecadeEnd}, select decade range`}
                 >
                   {" "}
-                  {row.map((day, dayIndex) => {
-                    const isSelected =
-                      selectedDate && isSameDay(day, selectedDate);
-                    const isCurrentMonth = isSameMonth(day, currentDate);
-                    const isCurrentDay = isToday(day);
-                    const dayStart = startOfDay(day);
-                    const isDisabledDay =
-                      !isCurrentMonth ||
-                      (minDate && isBefore(dayStart, minDate)) ||
-                      (maxDate && isAfter(dayStart, maxDate));
-
-                    let dayTextClasses = "text-base font-normal";
-                    let dayButtonClasses =
-                      "w-10 h-6 p-2 flex justify-center items-center gap-2 rounded-lg transition-colors focus:outline-none focus:ring-1 focus:ring-primary-focus";
-
-                    if (isDisabledDay) {
-                      dayTextClasses += " text-neutral-60";
-                      dayButtonClasses +=
-                        " bg-neutral-10 hover:bg-neutral-10 cursor-default";
-                    } else if (isSelected) {
-                      dayTextClasses += " text-white";
-                      dayButtonClasses +=
-                        " bg-primary-main hover:bg-primary-hover";
-                    } else if (isCurrentDay) {
-                      dayTextClasses += " text-neutral-90 font-bold";
-                      dayButtonClasses +=
-                        " bg-neutral-20 hover:bg-neutral-30 outline outline-1 outline-neutral-40 cursor-pointer";
-                    } else {
-                      dayTextClasses += " text-neutral-90";
-                      dayButtonClasses +=
-                        " bg-neutral-10 hover:bg-neutral-40 cursor-pointer";
-                    }
-
-                    return (
-                      <button
-                        type="button"
-                        key={dayIndex}
-                        className={dayButtonClasses}
-                        onClick={() => handleDayClick(day)}
-                        disabled={isDisabledDay || false}
-                        aria-label={
-                          isDisabledDay
-                            ? `Date ${format(day, "PPP")} (not selectable)`
-                            : `Select ${format(day, "PPP")}`
-                        }
-                        aria-pressed={isSelected || false}
-                      >
-                        {" "}
-                        <div className={dayTextClasses}>
-                          {format(day, "d")}
-                        </div>{" "}
-                      </button>
-                    );
-                  })}{" "}
-                </div>
-              ))}{" "}
-            </>
-          )}
-          {/* Month View */}
-          {view === "month" && (
-            <div className="grid grid-cols-3 gap-2 w-full">
-              {" "}
-              {monthsOfYear.map((monthName, monthIndex) => {
-                const isCurrentSelectedMonth =
-                  getMonth(currentDate) === monthIndex;
-                const targetMonthStart = startOfMonth(
-                  setMonth(currentDate, monthIndex)
-                );
-                const targetMonthEnd = endOfMonth(targetMonthStart);
-                const isDisabledMonth =
-                  (minDate && isBefore(targetMonthEnd, minDate)) ||
-                  (maxDate && isAfter(targetMonthStart, maxDate));
-
-                let monthButtonClasses = `flex-1 h-10 p-2 rounded-lg flex justify-center items-center gap-2 transition-colors focus:outline-none focus:ring-1 focus:ring-primary-focus`;
-                if (isDisabledMonth) {
-                  monthButtonClasses +=
-                    " bg-neutral-10 text-neutral-60 hover:bg-neutral-10 cursor-default";
-                } else if (isCurrentSelectedMonth) {
-                  monthButtonClasses +=
-                    " bg-primary-surface text-primary-main font-bold outline outline-1 outline-primary-border cursor-pointer";
-                } else {
-                  monthButtonClasses +=
-                    " bg-neutral-10 text-neutral-90 hover:bg-neutral-20 cursor-pointer";
+                  {`${currentViewDecadeStart} - ${currentViewDecadeEnd}`}{" "}
+                </button>
+              )}
+              {view === "decade" && (
+                <div className="justify-start text-neutral-90 text-lg font-bold">{`${decadeViewHeaderStart} - ${decadeViewHeaderEnd}`}</div>
+              )}
+            </div>
+            {/* Next */}
+            <div className="flex justify-end items-center gap-1">
+              {view === "day" && (
+                <button
+                  type="button"
+                  onClick={goToNextMonth}
+                  disabled={!canGoNextMonth}
+                  className={getNavButtonClasses(!canGoNextMonth)}
+                  aria-label="Next month"
+                >
+                  {" "}
+                  <UilAngleRight size="24" />{" "}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={
+                  view === "decade"
+                    ? goToNextDecadeBlock
+                    : view === "year"
+                    ? goToNextDecade
+                    : goToNextYear
                 }
+                disabled={
+                  (view === "decade" && !canGoNextDecadeBlock) ||
+                  (view === "year" && !canGoNextDecade) ||
+                  ((view === "day" || view === "month") && !canGoNextYear)
+                }
+                className={getNavButtonClasses(
+                  (view === "decade" && !canGoNextDecadeBlock) ||
+                    (view === "year" && !canGoNextDecade) ||
+                    ((view === "day" || view === "month") && !canGoNextYear)
+                )}
+                aria-label={
+                  view === "decade"
+                    ? "Next 100 years"
+                    : view === "year"
+                    ? "Next decade"
+                    : "Next year"
+                }
+              >
+                {" "}
+                <UilAngleDoubleRight size="24" />{" "}
+              </button>
+            </div>
+          </div>
 
-                return (
-                  <button
-                    key={monthIndex}
-                    type="button"
-                    className={monthButtonClasses}
-                    onClick={() => handleMonthClick(monthIndex)}
-                    disabled={isDisabledMonth || false}
-                    aria-label={
-                      isDisabledMonth
-                        ? `${monthName} ${getYear(
-                            currentDate
-                          )} (not selectable)`
-                        : `Select ${monthName} ${getYear(currentDate)}`
-                    }
+          {/* Calendar Grid */}
+          <div className="self-stretch flex flex-col justify-start items-start gap-2">
+            {/* Day View */}
+            {view === "day" && (
+              <>
+                {" "}
+                <div className="self-stretch inline-flex justify-start items-start gap-2">
+                  {" "}
+                  {daysOfWeek.map((day, index) => (
+                    <div
+                      key={`${day}-${index}`}
+                      className="flex-1 text-center justify-start text-neutral-100 text-base font-bold"
+                      aria-hidden="true"
+                    >
+                      {day}
+                    </div>
+                  ))}
+                  <div className="w-0"></div>
+                </div>{" "}
+                {calendarDays.map((row, rowIndex) => (
+                  <div
+                    key={rowIndex}
+                    className="self-stretch inline-flex justify-start items-start gap-2"
                   >
                     {" "}
-                    <div className="text-center text-base">
-                      {monthName}
-                    </div>{" "}
-                  </button>
-                );
-              })}{" "}
-            </div>
-          )}
-          {/* Year View */}
-          {view === "year" && (
-            <div className="grid grid-cols-3 gap-2 w-full">
-              {" "}
-              {calendarYears.flat().map((yearDate) => {
-                const year = getYear(yearDate);
-                const isCurrentSelectedYear = getYear(currentDate) === year;
-                const isCurrentDecadeYear =
-                  year >= currentViewDecadeStart &&
-                  year <= currentViewDecadeEnd;
-                const isSelectableYear =
-                  (!minDate || year >= getYear(minDate)) &&
-                  (!maxDate || year <= getYear(maxDate));
-                const isDisabled = !isCurrentDecadeYear || !isSelectableYear;
+                    {row.map((day, dayIndex) => {
+                      const isSelected =
+                        selectedDate && isSameDay(day, selectedDate);
+                      const isCurrentMonth = isSameMonth(day, currentDate);
+                      const isCurrentDay = isToday(day);
+                      const dayStart = startOfDay(day);
+                      const isDisabledDay =
+                        !isCurrentMonth ||
+                        (minDate && isBefore(dayStart, minDate)) ||
+                        (maxDate && isAfter(dayStart, maxDate));
 
-                let yearButtonClasses = `flex-1 h-10 p-2 rounded-lg flex justify-center items-center gap-2 transition-colors focus:outline-none focus:ring-1 focus:ring-primary-focus`;
-                let yearTextClasses = "text-center text-base";
+                      let dayTextClasses = "text-base font-normal";
+                      let dayButtonClasses =
+                        "w-10 h-6 p-2 flex justify-center items-center gap-2 rounded-lg transition-colors focus:outline-none focus:ring-1 focus:ring-primary-focus";
 
-                if (!isSelectableYear) {
-                  // Not selectable, but could be outside current decade
-                  if (maxDate && year > getYear(maxDate)) {
-                    yearTextClasses += " text-neutral-50"; // Dimmer for future
-                    yearButtonClasses +=
-                      " bg-neutral-20 hover:bg-neutral-20 cursor-default";
+                      if (isDisabledDay) {
+                        dayTextClasses += " text-neutral-60";
+                        dayButtonClasses +=
+                          " bg-neutral-10 hover:bg-neutral-10 cursor-default";
+                      } else if (isSelected) {
+                        dayTextClasses += " text-white";
+                        dayButtonClasses +=
+                          " bg-primary-main hover:bg-primary-hover";
+                      } else if (isCurrentDay) {
+                        dayTextClasses += " text-neutral-90 font-bold";
+                        dayButtonClasses +=
+                          " bg-neutral-20 hover:bg-neutral-30 outline outline-1 outline-neutral-40 cursor-pointer";
+                      } else {
+                        dayTextClasses += " text-neutral-90";
+                        dayButtonClasses +=
+                          " bg-neutral-10 hover:bg-neutral-40 cursor-pointer";
+                      }
+
+                      return (
+                        <button
+                          type="button"
+                          key={dayIndex}
+                          className={dayButtonClasses}
+                          onClick={() => handleDayClick(day)}
+                          disabled={isDisabledDay || false}
+                          aria-label={
+                            isDisabledDay
+                              ? `Date ${format(day, "PPP")} (not selectable)`
+                              : `Select ${format(day, "PPP")}`
+                          }
+                          aria-pressed={isSelected || false}
+                        >
+                          {" "}
+                          <div className={dayTextClasses}>
+                            {format(day, "d")}
+                          </div>{" "}
+                        </button>
+                      );
+                    })}{" "}
+                  </div>
+                ))}{" "}
+              </>
+            )}
+            {/* Month View */}
+            {view === "month" && (
+              <div className="grid grid-cols-3 gap-2 w-full">
+                {" "}
+                {monthsOfYear.map((monthName, monthIndex) => {
+                  const isCurrentSelectedMonth =
+                    getMonth(currentDate) === monthIndex;
+                  const targetMonthStart = startOfMonth(
+                    setMonth(currentDate, monthIndex)
+                  );
+                  const targetMonthEnd = endOfMonth(targetMonthStart);
+                  const isDisabledMonth =
+                    (minDate && isBefore(targetMonthEnd, minDate)) ||
+                    (maxDate && isAfter(targetMonthStart, maxDate));
+
+                  let monthButtonClasses = `flex-1 h-10 p-2 rounded-lg flex justify-center items-center gap-2 transition-colors focus:outline-none focus:ring-1 focus:ring-primary-focus`;
+                  if (isDisabledMonth) {
+                    monthButtonClasses +=
+                      " bg-neutral-10 text-neutral-60 hover:bg-neutral-10 cursor-default";
+                  } else if (isCurrentSelectedMonth) {
+                    monthButtonClasses +=
+                      " bg-primary-surface text-primary-main font-bold outline outline-1 outline-primary-border cursor-pointer";
                   } else {
-                    yearTextClasses += " text-neutral-60"; // Standard disabled
+                    monthButtonClasses +=
+                      " bg-neutral-10 text-neutral-90 hover:bg-neutral-20 cursor-pointer";
+                  }
+
+                  return (
+                    <button
+                      key={monthIndex}
+                      type="button"
+                      className={monthButtonClasses}
+                      onClick={() => handleMonthClick(monthIndex)}
+                      disabled={isDisabledMonth || false}
+                      aria-label={
+                        isDisabledMonth
+                          ? `${monthName} ${getYear(
+                              currentDate
+                            )} (not selectable)`
+                          : `Select ${monthName} ${getYear(currentDate)}`
+                      }
+                    >
+                      {" "}
+                      <div className="text-center text-base">
+                        {monthName}
+                      </div>{" "}
+                    </button>
+                  );
+                })}{" "}
+              </div>
+            )}
+            {/* Year View */}
+            {view === "year" && (
+              <div className="grid grid-cols-3 gap-2 w-full">
+                {" "}
+                {calendarYears.flat().map((yearDate) => {
+                  const year = getYear(yearDate);
+                  const isCurrentSelectedYear = getYear(currentDate) === year;
+                  const isCurrentDecadeYear =
+                    year >= currentViewDecadeStart &&
+                    year <= currentViewDecadeEnd;
+                  const isSelectableYear =
+                    (!minDate || year >= getYear(minDate)) &&
+                    (!maxDate || year <= getYear(maxDate));
+                  const isDisabled = !isCurrentDecadeYear || !isSelectableYear;
+
+                  let yearButtonClasses = `flex-1 h-10 p-2 rounded-lg flex justify-center items-center gap-2 transition-colors focus:outline-none focus:ring-1 focus:ring-primary-focus`;
+                  let yearTextClasses = "text-center text-base";
+
+                  if (!isSelectableYear) {
+                    // Not selectable, but could be outside current decade
+                    if (maxDate && year > getYear(maxDate)) {
+                      yearTextClasses += " text-neutral-50"; // Dimmer for future
+                      yearButtonClasses +=
+                        " bg-neutral-20 hover:bg-neutral-20 cursor-default";
+                    } else {
+                      yearTextClasses += " text-neutral-60"; // Standard disabled
+                      yearButtonClasses +=
+                        " bg-neutral-10 hover:bg-neutral-10 cursor-default";
+                    }
+                  } else if (!isCurrentDecadeYear) {
+                    // Selectable, but outside current decade view
+                    yearTextClasses += " text-neutral-60";
                     yearButtonClasses +=
                       " bg-neutral-10 hover:bg-neutral-10 cursor-default";
-                  }
-                } else if (!isCurrentDecadeYear) {
-                  // Selectable, but outside current decade view
-                  yearTextClasses += " text-neutral-60";
-                  yearButtonClasses +=
-                    " bg-neutral-10 hover:bg-neutral-10 cursor-default";
-                } else if (isCurrentSelectedYear) {
-                  // Current selected year
-                  yearTextClasses += " text-primary-main font-bold";
-                  yearButtonClasses +=
-                    " bg-primary-surface outline outline-1 outline-primary-border hover:bg-primary-surface cursor-pointer";
-                } else {
-                  // Default selectable year
-                  yearTextClasses += " text-neutral-90";
-                  yearButtonClasses +=
-                    " bg-neutral-10 hover:bg-neutral-20 cursor-pointer";
-                }
-
-                return (
-                  <button
-                    key={year}
-                    type="button"
-                    className={yearButtonClasses}
-                    onClick={() => handleYearClick(year)}
-                    disabled={isDisabled}
-                    aria-label={
-                      isDisabled
-                        ? `Year ${year} (not selectable)`
-                        : `Select year ${year}`
-                    }
-                    aria-pressed={isCurrentSelectedYear && isSelectableYear}
-                  >
-                    {" "}
-                    <div className={yearTextClasses}>{year}</div>{" "}
-                  </button>
-                );
-              })}{" "}
-            </div>
-          )}
-          {/* Decade View */}
-          {view === "decade" && (
-            <div className="grid grid-cols-3 gap-2 w-full">
-              {" "}
-              {calendarDecades.flat().map((decade) => {
-                const isCurrentDecadeRange =
-                  currentViewDecadeStart >= decade.start &&
-                  currentViewDecadeEnd <= decade.end;
-                const isSelectableDecade =
-                  (!minDate || decade.end >= getYear(minDate)) &&
-                  (!maxDate || decade.start <= getYear(maxDate));
-
-                let decadeButtonClasses = `flex-1 h-10 p-2 rounded-lg flex justify-center items-center gap-2 transition-colors focus:outline-none focus:ring-1 focus:ring-primary-focus text-center text-base `;
-                let isDisabled = !isSelectableDecade;
-
-                if (isCurrentDecadeRange && isSelectableDecade) {
-                  decadeButtonClasses +=
-                    " bg-primary-surface text-primary-main font-bold outline outline-1 outline-primary-border hover:bg-primary-surface cursor-pointer";
-                } else if (isSelectableDecade) {
-                  decadeButtonClasses +=
-                    " bg-neutral-10 text-neutral-90 hover:bg-neutral-20 cursor-pointer";
-                } else {
-                  if (maxDate && decade.start > getYear(maxDate)) {
-                    decadeButtonClasses +=
-                      " bg-neutral-20 text-neutral-50 hover:bg-neutral-20 cursor-default";
+                  } else if (isCurrentSelectedYear) {
+                    // Current selected year
+                    yearTextClasses += " text-primary-main font-bold";
+                    yearButtonClasses +=
+                      " bg-primary-surface outline outline-1 outline-primary-border hover:bg-primary-surface cursor-pointer";
                   } else {
-                    decadeButtonClasses +=
-                      " bg-neutral-10 text-neutral-60 hover:bg-neutral-10 cursor-default";
+                    // Default selectable year
+                    yearTextClasses += " text-neutral-90";
+                    yearButtonClasses +=
+                      " bg-neutral-10 hover:bg-neutral-20 cursor-pointer";
                   }
-                  isDisabled = true;
-                }
 
-                return (
-                  <button
-                    key={decade.start}
-                    type="button"
-                    className={decadeButtonClasses}
-                    onClick={() => handleDecadeClick(decade.start)}
-                    disabled={isDisabled}
-                    aria-label={
-                      isDisabled
-                        ? `Decade ${decade.start} - ${decade.end} (not selectable)`
-                        : `Select decade ${decade.start} - ${decade.end}`
+                  return (
+                    <button
+                      key={year}
+                      type="button"
+                      className={yearButtonClasses}
+                      onClick={() => handleYearClick(year)}
+                      disabled={isDisabled}
+                      aria-label={
+                        isDisabled
+                          ? `Year ${year} (not selectable)`
+                          : `Select year ${year}`
+                      }
+                      aria-pressed={isCurrentSelectedYear && isSelectableYear}
+                    >
+                      {" "}
+                      <div className={yearTextClasses}>{year}</div>{" "}
+                    </button>
+                  );
+                })}{" "}
+              </div>
+            )}
+            {/* Decade View */}
+            {view === "decade" && (
+              <div className="grid grid-cols-3 gap-2 w-full">
+                {" "}
+                {calendarDecades.flat().map((decade) => {
+                  const isCurrentDecadeRange =
+                    currentViewDecadeStart >= decade.start &&
+                    currentViewDecadeEnd <= decade.end;
+                  const isSelectableDecade =
+                    (!minDate || decade.end >= getYear(minDate)) &&
+                    (!maxDate || decade.start <= getYear(maxDate));
+
+                  let decadeButtonClasses = `flex-1 h-10 p-2 rounded-lg flex justify-center items-center gap-2 transition-colors focus:outline-none focus:ring-1 focus:ring-primary-focus text-center text-base `;
+                  let isDisabled = !isSelectableDecade;
+
+                  if (isCurrentDecadeRange && isSelectableDecade) {
+                    decadeButtonClasses +=
+                      " bg-primary-surface text-primary-main font-bold outline outline-1 outline-primary-border hover:bg-primary-surface cursor-pointer";
+                  } else if (isSelectableDecade) {
+                    decadeButtonClasses +=
+                      " bg-neutral-10 text-neutral-90 hover:bg-neutral-20 cursor-pointer";
+                  } else {
+                    if (maxDate && decade.start > getYear(maxDate)) {
+                      decadeButtonClasses +=
+                        " bg-neutral-20 text-neutral-50 hover:bg-neutral-20 cursor-default";
+                    } else {
+                      decadeButtonClasses +=
+                        " bg-neutral-10 text-neutral-60 hover:bg-neutral-10 cursor-default";
                     }
-                    aria-pressed={isCurrentDecadeRange && isSelectableDecade}
-                  >
-                    {" "}
-                    {`${decade.start}-${decade.end}`}{" "}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                    isDisabled = true;
+                  }
 
-        {/* --- Today Button Footer --- */}
-        <div className="self-stretch pt-4 border-t border-neutral-30">
-          <button
-            type="button"
-            onClick={handleTodayClick}
-            disabled={isTodayDisabled || false}
-            className="cursor-pointer w-full px-4 py-2 rounded-lg text-base font-medium transition-colors
+                  return (
+                    <button
+                      key={decade.start}
+                      type="button"
+                      className={decadeButtonClasses}
+                      onClick={() => handleDecadeClick(decade.start)}
+                      disabled={isDisabled}
+                      aria-label={
+                        isDisabled
+                          ? `Decade ${decade.start} - ${decade.end} (not selectable)`
+                          : `Select decade ${decade.start} - ${decade.end}`
+                      }
+                      aria-pressed={isCurrentDecadeRange && isSelectableDecade}
+                    >
+                      {" "}
+                      {`${decade.start}-${decade.end}`}{" "}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* --- Today Button Footer --- */}
+          <div className="self-stretch pt-4 border-t border-neutral-30">
+            <button
+              type="button"
+              onClick={handleTodayClick}
+              disabled={isTodayDisabled || false}
+              className="cursor-pointer w-full px-4 py-2 rounded-lg text-base font-medium transition-colors
               disabled:bg-neutral-30 disabled:text-neutral-60 disabled:cursor-not-allowed
               enabled:bg-primary-surface enabled:text-primary-main enabled:hover:bg-primary-hover enabled:hover:text-primary-surface enabled:focus:outline-none enabled:focus:ring-1 enabled:focus:ring-primary-focus"
-            aria-label={
-              isTodayDisabled
-                ? `Today, ${format(today, "PPP")} (not selectable)`
-                : `Select Today, ${format(today, "PPP")}`
-            }
-          >
-            Today
-          </button>
+              aria-label={
+                isTodayDisabled
+                  ? `Today, ${format(today, "PPP")} (not selectable)`
+                  : `Select Today, ${format(today, "PPP")}`
+              }
+            >
+              Today
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -936,6 +1042,7 @@ export function useDatePickerPopover({
     goToNextDecadeBlock,
     setIsOpen,
     setView,
+    isMobile,
   ]);
 
   /** Creates the React Portal for the popover element. */

@@ -24,6 +24,7 @@ export interface RadioInputConfig extends BaseInputConfig {
   type: "radio";
   options: RadioOption[];
   name: string;
+  selectedValue?: string | null;
 }
 
 // Config for DropdownInput

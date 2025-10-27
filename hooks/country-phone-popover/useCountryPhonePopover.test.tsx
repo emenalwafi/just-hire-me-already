@@ -81,18 +81,27 @@ const mockCountries: Country[] = [
  * the `mockOnSelectCountry` function, the `anchorRef`, and the element's `rerenderElement` function.
  */
 const setupHook = (props: Partial<UseCountryPhonePopoverProps> = {}) => {
-  const anchorRef = { current: document.createElement("button") };
-  jest.spyOn(anchorRef.current, "getBoundingClientRect").mockReturnValue({
-    width: 100,
-    height: 40,
-    top: 50,
-    left: 50,
-    bottom: 90,
-    right: 150,
-    x: 50,
-    y: 50,
-    toJSON: () => ({}),
-  } as DOMRect);
+  const mockAnchorElement = document.createElement("button");
+
+  const anchorRef = {
+    current: {
+      parentElement: mockAnchorElement,
+      contains: (target: Node) => mockAnchorElement.contains(target),
+    },
+  };
+  jest
+    .spyOn(anchorRef.current.parentElement, "getBoundingClientRect")
+    .mockReturnValue({
+      width: 100,
+      height: 40,
+      top: 50,
+      left: 50,
+      bottom: 90,
+      right: 150,
+      x: 50,
+      y: 50,
+      toJSON: () => ({}),
+    } as DOMRect);
 
   const mockOnSelectCountry = jest.fn();
 
@@ -100,7 +109,7 @@ const setupHook = (props: Partial<UseCountryPhonePopoverProps> = {}) => {
     (p: UseCountryPhonePopoverProps) => useCountryPhonePopover(p),
     {
       initialProps: {
-        anchorRef: anchorRef as React.RefObject<HTMLElement>,
+        anchorRef: anchorRef as unknown as React.RefObject<HTMLElement>,
         onSelectCountry: mockOnSelectCountry,
         countries: mockCountries,
         ...props,
@@ -171,7 +180,7 @@ describe("useCountryPhonePopover", () => {
         result.current.setIsOpen(true);
       });
       rerender({
-        anchorRef: anchorRef as React.RefObject<HTMLElement>,
+        anchorRef: anchorRef as unknown as React.RefObject<HTMLElement>,
         onSelectCountry: mockOnSelectCountry,
         countries: mockCountries,
       });
@@ -277,7 +286,7 @@ describe("useCountryPhonePopover", () => {
         result.current.setIsOpen(true);
       });
       rerender({
-        anchorRef: anchorRef as React.RefObject<HTMLElement>,
+        anchorRef: anchorRef as unknown as React.RefObject<HTMLElement>,
         onSelectCountry: mockOnSelectCountry,
         countries: mockCountries,
       });

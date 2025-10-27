@@ -13,8 +13,8 @@ import { format, parseISO, startOfDay } from "date-fns";
  * @description This file contains unit tests for the `useDatePickerPopover` hook,
  * covering initialization, state management, UI rendering via the returned
  * `popoverElement`, view navigation, date selection, min/max date constraints,
- * and the "Today" button functionality. It mocks dependencies like `react-dom`,
- * icons, and system time.
+ * "Today" button functionality, and responsive mobile/desktop UI rendering.
+ * It mocks dependencies like `react-dom`, icons, and system time.
  */
 
 // --- Mocks ---
@@ -72,7 +72,8 @@ afterAll(() => {
  * 3. Rendering the hook using `renderHook`.
  * 4. Rendering the hook's `popoverElement` using `render`.
  * 5. Wrapping the hook's `rerender` function to automatically update the UI render
- * whenever the hook is rerendered, keeping them synchronized.
+ * (wrapped in `act`) whenever the hook is rerendered, keeping them synchronized
+ * and correctly handling `useLayoutEffect` state updates.
  *
  * @param {Partial<UseDatePickerPopoverProps>} props - Optional props to override the hook's defaults.
  * @returns {object} An object containing the hook's `result`, the `mockOnChange` function,
@@ -111,6 +112,11 @@ const setupHook = (props: Partial<UseDatePickerPopoverProps> = {}) => {
     hookResult.result.current.popoverElement
   );
 
+  /**
+   * Custom rerender function that rerenders the hook AND the UI.
+   * The UI rerender is wrapped in `act` to properly handle
+   * state updates from `useLayoutEffect`.
+   */
   const customRerender = (
     newProps: Partial<UseDatePickerPopoverProps> = {}
   ) => {
@@ -121,7 +127,9 @@ const setupHook = (props: Partial<UseDatePickerPopoverProps> = {}) => {
       ...props,
       ...newProps,
     });
-    renderRerender(hookResult.result.current.popoverElement);
+    act(() => {
+      renderRerender(hookResult.result.current.popoverElement);
+    });
   };
 
   return {
@@ -239,8 +247,10 @@ describe("useDatePickerPopover", () => {
       act(() => {
         fireEvent.mouseDown(document.body);
       });
+      rerender();
 
       expect(result.current.isOpen).toBe(false);
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
 
     /**
@@ -280,6 +290,138 @@ describe("useDatePickerPopover", () => {
         "bg-neutral-20 hover:bg-neutral-30 outline outline-1 outline-neutral-40"
       );
       expect(todayButton).not.toHaveClass("bg-primary-main");
+    });
+  });
+
+  /**
+   * @describe Tests for responsive mobile/desktop UI changes.
+   */
+  describe("Responsive UI (Mobile/Desktop)", () => {
+    let originalInnerWidth: number;
+
+    beforeEach(() => {
+      originalInnerWidth = window.innerWidth;
+    });
+
+    afterEach(() => {
+      Object.defineProperty(window, "innerWidth", {
+        writable: true,
+        configurable: true,
+        value: originalInnerWidth,
+      });
+    });
+
+    /**
+     * @it Verifies desktop rendering with absolute positioning.
+     */
+    it("should render as a desktop popover with absolute positioning", () => {
+      Object.defineProperty(window, "innerWidth", {
+        writable: true,
+        configurable: true,
+        value: 1024,
+      });
+
+      const { result, rerender } = setupHook();
+
+      act(() => {
+        result.current.setIsOpen(true);
+      });
+      rerender();
+      rerender();
+
+      const dialog = screen.getByRole("dialog", { name: "Date Picker" });
+
+      expect(dialog).toHaveStyle("position: absolute");
+      expect(dialog).toHaveStyle("visibility: visible"); // Add visibility check
+      expect(dialog).toHaveStyle("top: 0px");
+      expect(dialog).toHaveStyle("left: 0px");
+      expect(dialog.parentElement).not.toHaveClass("fixed");
+    });
+
+    /**
+     * @it Verifies mobile rendering with a fixed modal backdrop.
+     */
+    it("should render as a mobile modal with a fixed backdrop", () => {
+      Object.defineProperty(window, "innerWidth", {
+        writable: true,
+        configurable: true,
+        value: 400,
+      });
+
+      const { result, rerender } = setupHook();
+      expect(result.current.popoverElement).toBe(null);
+
+      act(() => {
+        result.current.setIsOpen(true);
+      });
+      rerender();
+
+      const dialog = screen.getByRole("dialog", { name: "Date Picker" });
+      const backdrop = dialog.parentElement;
+
+      expect(backdrop).toHaveClass("fixed", "inset-0", "bg-black/50");
+      expect(dialog).not.toHaveStyle("position: absolute");
+    });
+
+    /**
+     * @it Verifies resizing from desktop to mobile.
+     */
+    it("should switch from desktop to mobile view on resize", () => {
+      Object.defineProperty(window, "innerWidth", { value: 1024 });
+      const { result, rerender } = setupHook();
+      act(() => {
+        result.current.setIsOpen(true);
+      });
+      rerender();
+      rerender();
+
+      const dialog = screen.getByRole("dialog", { name: "Date Picker" });
+      expect(dialog).toHaveStyle("position: absolute");
+      expect(dialog.parentElement).not.toHaveClass("fixed");
+
+      act(() => {
+        Object.defineProperty(window, "innerWidth", { value: 400 });
+        fireEvent(window, new Event("resize"));
+      });
+      rerender();
+
+      const mobileDialog = screen.getByRole("dialog", { name: "Date Picker" });
+      const backdrop = mobileDialog.parentElement;
+
+      expect(backdrop).toHaveClass("fixed", "inset-0", "bg-black/50");
+      expect(mobileDialog).not.toHaveStyle("position: absolute");
+    });
+
+    /**
+     * @it Verifies resizing from mobile to desktop.
+     */
+    it("should switch from mobile to desktop view on resize", () => {
+      Object.defineProperty(window, "innerWidth", { value: 400 });
+      const { result, rerender } = setupHook();
+      act(() => {
+        result.current.setIsOpen(true);
+      });
+      rerender();
+
+      const mobileDialog = screen.getByRole("dialog", { name: "Date Picker" });
+      expect(mobileDialog.parentElement).toHaveClass("fixed");
+      expect(mobileDialog).not.toHaveStyle("position: absolute");
+
+      act(() => {
+        Object.defineProperty(window, "innerWidth", { value: 1024 });
+        fireEvent(window, new Event("resize"));
+      });
+      rerender();
+      rerender();
+
+      const desktopDialog = screen.getByRole("dialog", {
+        name: "Date Picker",
+      });
+      expect(desktopDialog).toHaveStyle("position: absolute");
+      expect(desktopDialog).toHaveStyle("visibility: visible");
+      expect(desktopDialog).toHaveStyle("top: 98px");
+      expect(desktopDialog).toHaveStyle("left: 50px");
+      expect(desktopDialog.parentElement).not.toHaveClass("fixed");
     });
   });
 

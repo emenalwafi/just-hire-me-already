@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import Chip from "@/components/input/chip/Chip";
 import Input from "@/components/input/Input";
 import {
@@ -11,9 +11,7 @@ import {
   DatePickerConfig,
   PhoneNumberInputConfig,
   InputValue,
-  InputOnChange,
   UnifiedChangeValue,
-  PhoneCountryChange,
 } from "@/types/InputConfig";
 import { DropdownOption } from "@/hooks/dropdown-popover/useDropdownPopover";
 import {
@@ -419,7 +417,7 @@ export default function Home() {
         </h2>
         <form className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-16 items-start">
           {inputFields.map((field) => {
-            let currentConfig: InputConfig = {
+            const currentConfig: InputConfig = {
               ...field.config,
               ...field.stateProps,
             } as InputConfig;

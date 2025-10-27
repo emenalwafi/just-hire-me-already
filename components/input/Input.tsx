@@ -9,7 +9,6 @@ import {
   InputConfig,
   InputValue,
   InputOnChange,
-  // Import specific value/onChange types for assertions
   TextInputValue,
   TextInputComponentOnChange,
   RadioValue,
@@ -20,25 +19,38 @@ import {
   DatePickerOnChange,
   PhoneValue,
   PhoneOnChange,
-  // Import PhoneCountryChange for the new prop
   PhoneCountryChange,
 } from "@/types/InputConfig"; // Adjust path as needed
 
-// Define Props for the Unified Input - ADDED onCountryChange
+/**
+ * Props for the unified `Input` component.
+ */
 interface InputProps {
+  /** The configuration object defining the type and properties of the input to render. */
   config: InputConfig;
+  /** The current value of the input. Type depends on the `config.type`. */
   value: InputValue;
+  /** The unified callback function invoked when the input's value changes. */
   onChange: InputOnChange;
-  onCountryChange?: PhoneCountryChange; // Optional callback for phone country change
+  /** Optional callback function invoked specifically when the country selection changes in a 'phone' type input. */
+  onCountryChange?: PhoneCountryChange;
 }
 
 /**
- * @component Input (Unified)
- * @description Renders a specific input component based on the provided configuration object.
- * Acts as a wrapper to simplify form building.
+ * A unified input component that renders a specific input field
+ * (TextInput, RadioInput, DropdownInput, DatePicker, PhoneNumberInput)
+ * based on the provided `config` object.
+ *
+ * This component acts as a wrapper to abstract away the different input types,
+ * allowing for dynamic form generation based on configuration. It handles passing
+ * the correct props and adapting the `onChange` handler for each specific input type.
  *
  * @param {InputProps} props - The props for the Input component.
- * @returns {React.ReactElement | null} The rendered specific input component or null.
+ * @param {InputConfig} props.config - Configuration object determining the input type and its specific props.
+ * @param {InputValue} props.value - The current value for the input field.
+ * @param {InputOnChange} props.onChange - The unified callback function to handle value changes.
+ * @param {PhoneCountryChange} [props.onCountryChange] - Optional callback for phone input country changes.
+ * @returns {React.ReactElement | null} The rendered specific input component based on the config, or null if the type is unhandled.
  */
 const Input: React.FC<InputProps> = ({
   config,
@@ -46,11 +58,8 @@ const Input: React.FC<InputProps> = ({
   onChange,
   onCountryChange,
 }) => {
-  // Added onCountryChange
-  // Extract common props that might exist on config
   const { label, required, disabled, error, name } = config;
 
-  // --- Render based on type ---
   switch (config.type) {
     case "text":
     case "email":
@@ -117,7 +126,7 @@ const Input: React.FC<InputProps> = ({
           disabled={disabled}
           error={error}
           value={value as DatePickerValue}
-          onChange={handleDateChange} // Use specific handler type if needed, cast works too
+          onChange={handleDateChange}
           placeholder={config.placeholder}
           minDate={config.minDate}
           maxDate={config.maxDate}
@@ -125,7 +134,6 @@ const Input: React.FC<InputProps> = ({
       );
 
     case "phone":
-      // Now pass down selectedCountryIso and onCountryChange
       return (
         <PhoneNumberInput
           label={label}
@@ -134,8 +142,8 @@ const Input: React.FC<InputProps> = ({
           error={error}
           value={value as PhoneValue}
           onChange={onChange as PhoneOnChange}
-          selectedCountryIso={config.selectedCountryIso || ''} // Pass from config
-          onCountryChange={onCountryChange} // Pass from InputProps
+          selectedCountryIso={config.selectedCountryIso ?? null}
+          onCountryChange={onCountryChange}
           placeholder={config.placeholder}
           defaultCountryIso={config.defaultCountryIso}
           disabledCountryIsos={config.disabledCountryIsos}
