@@ -163,13 +163,19 @@ async function initDB(): Promise<IDBPDatabase<JobAppDB>> {
 // -- Jobs --
 export async function addJob(job: Job): Promise<string> {
   const db = await initDB();
+  // Ensure job has an ID if not provided
+  if (!job.id) job.id = uuidv4();
   return db.add("jobs", job);
 }
 export async function getAllJobs(): Promise<Job[]> {
   const db = await initDB();
   return db.getAll("jobs");
 }
-// Add getJobById, updateJob, deleteJob etc. as needed
+export async function getJobById(id: string): Promise<Job | undefined> {
+  const db = await initDB();
+  return db.get("jobs", id);
+}
+// Add updateJob, deleteJob etc. as needed
 
 // -- Job Configurations --
 export async function saveJobApplicationConfiguration(
@@ -234,7 +240,17 @@ export async function addUser(user: User): Promise<string> {
     console.error("Attempted to add user without a hashed password!");
     throw new Error("User password must be hashed before adding.");
   }
-  return db.add("users", user);
+  try {
+    return await db.add("users", user);
+  } catch (error: any) {
+    if (error.name === "ConstraintError") {
+      console.error(`Error adding user: Email "${user.email}" already exists.`);
+      throw new Error(`Email "${user.email}" already exists.`);
+    } else {
+      console.error("Error adding user:", error);
+      throw error; // Re-throw other errors
+    }
+  }
 }
 export async function getUserByEmail(email: string): Promise<User | undefined> {
   const db = await initDB();
@@ -380,7 +396,7 @@ export async function seedInitialData(): Promise<void> {
       await stores.users.add(adminUser);
       console.log("Default Admin User seeded.");
 
-      if (candidateList.data.length > 0) {
+      if (candidateList.data.length > 0 && candidateList.data[0].id) {
         const candidatePasswordHash = await hashPassword("password"); // Example password 'password'
         const candidateUser: User = {
           id: uuidv4(),
@@ -433,6 +449,86 @@ export async function seedInitialData(): Promise<void> {
     console.log("Seeding failed, transaction aborted.");
     // Avoid throwing here to prevent unhandled promise rejections if seed fails
   }
+}
+
+// --- Authentication Service Functions ---
+
+/**
+ * Attempts to log in a user with email and password.
+ * @param email The user's email.
+ * @param plainPassword The user's plain text password.
+ * @returns The User object if login is successful.
+ * @throws Error if email is not found or password does not match.
+ */
+export async function loginUser(
+  email: string,
+  plainPassword: string
+): Promise<User> {
+  const user = await getUserByEmail(email);
+
+  if (!user) {
+    console.warn(`Login failed: Email "${email}" not found.`);
+    throw new Error("Invalid email or password.");
+  }
+
+  if (!user.hashedPassword) {
+    console.error(`Login failed: User "${email}" has no password set.`);
+    throw new Error("User account is not properly configured."); // Should not happen with current setup
+  }
+
+  const isPasswordCorrect = await verifyPassword(
+    plainPassword,
+    user.hashedPassword
+  );
+
+  if (!isPasswordCorrect) {
+    console.warn(`Login failed: Incorrect password for email "${email}".`);
+    throw new Error("Invalid email or password.");
+  }
+
+  console.log(`Login successful for user: ${user.email}`);
+  // Omit hashedPassword before returning user object to frontend state
+  const { hashedPassword, ...userWithoutPassword } = user;
+  return userWithoutPassword;
+}
+
+/**
+ * Registers a new user. Hashes the password before adding to the database.
+ * @param userData Object containing name, email, plainPassword, role, and optional candidateProfileId.
+ * @returns The newly created User object (without the hashed password).
+ * @throws Error if the email already exists or hashing fails.
+ */
+export async function registerUser(
+  userData: Omit<User, "id" | "hashedPassword"> & { plainPassword: string }
+): Promise<Omit<User, "hashedPassword">> {
+  const { email, plainPassword, name, role, candidateProfileId } = userData;
+
+  // Check if user already exists
+  const existingUser = await getUserByEmail(email);
+  if (existingUser) {
+    throw new Error(`Email "${email}" is already registered.`);
+  }
+
+  // Hash the password
+  const hashedPassword = await hashPassword(plainPassword);
+
+  // Create the new user object
+  const newUser: User = {
+    id: uuidv4(), // Generate ID here
+    email,
+    name,
+    hashedPassword,
+    role,
+    candidateProfileId: role === "candidate" ? candidateProfileId : undefined,
+  };
+
+  // Add user to the database (addUser handles potential constraint errors)
+  await addUser(newUser);
+
+  console.log(`Registration successful for user: ${newUser.email}`);
+  // Return the user object without the hash
+  const { hashedPassword: _, ...userWithoutPassword } = newUser;
+  return userWithoutPassword;
 }
 
 // --- Password Hashing Helpers (Client-Side using Web Crypto API) ---
