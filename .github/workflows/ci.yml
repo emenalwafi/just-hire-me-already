@@ -1,0 +1,39 @@
+# Name of your workflow
+name: Node.js CI
+
+# Controls when the workflow will run
+on:
+  push: # Runs on every push to any branch
+  pull_request: # Also runs on pull requests
+
+# A workflow run is made up of one or more jobs
+jobs:
+  # This job is named "build-and-test"
+  build-and-test:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks
+    steps:
+      # 1. Checks out your repository code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Sets up the Node.js environment
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: "npm" # Caches npm packages for faster builds
+
+      # 3. Installs your project's dependencies
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. Runs the ESLint command from your package.json
+      - name: Run linter
+        run: npm run lint
+
+      # 5. Runs the Jest command from your package.json
+      - name: Run tests
+        run: npm run test
