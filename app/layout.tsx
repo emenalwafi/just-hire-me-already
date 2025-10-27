@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
-// Import Nunito_Sans instead of Geist
 import { Nunito_Sans } from "next/font/google";
 import "./globals.css";
+import { StoreProvider } from "@/store/StoreProvider";
 
-// Configure Nunito Sans
 const nunitoSans = Nunito_Sans({
-  variable: "--font-nunito-sans", // Use a new variable name
+  variable: "--font-nunito-sans",
   subsets: ["latin"],
   weight: ["200", "300", "400", "500", "600", "700", "800", "900", "1000"],
 });
@@ -23,7 +22,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${nunitoSans.variable} antialiased`}>
-        {children}
+        <StoreProvider>{children}</StoreProvider>
       </body>
     </html>
   );

@@ -150,7 +150,7 @@ export const candidateList: { data: Candidate[] } = {
           order: 2,
         },
         {
-          key: "phone_number",
+          key: "phone",
           label: "Phone",
           value: "+62 812-1234-5678",
           order: 3,
@@ -188,7 +188,7 @@ export const candidateList: { data: Candidate[] } = {
           order: 2,
         },
         {
-          key: "phone_number",
+          key: "phone",
           label: "Phone",
           value: "+62 856-7890-1234",
           order: 3,

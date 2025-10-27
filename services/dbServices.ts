@@ -1,4 +1,4 @@
-import { openDB, DBSchema, IDBPDatabase, IDBPTransaction } from "idb";
+import { openDB, DBSchema, IDBPDatabase } from "idb";
 import {
   Job,
   JobApplicationConfiguration, // Updated type
@@ -18,7 +18,7 @@ import { v4 as uuidv4 } from "uuid"; // Import uuid for generating unique IDs
 /** The name of the IndexedDB database. */
 const DB_NAME = "JobAppData";
 /** The current version of the IndexedDB database schema. Increment version for schema changes. */
-const DB_VERSION = 2; // Incremented version
+const DB_VERSION = 2;
 
 /**
  * Defines the schema structure for the Job Application IndexedDB database.
@@ -39,7 +39,6 @@ interface JobAppDB extends DBSchema {
     key: string;
     /** The value type (either Application or Posting configuration). */
     value: JobApplicationConfiguration | JobPostingConfiguration;
-    // No indexes needed if fetching by known fixed keys
   };
   /** Object store for candidate profiles. */
   candidates: {
@@ -48,7 +47,7 @@ interface JobAppDB extends DBSchema {
   };
   /** Object store for user accounts. */
   users: {
-    key: string; // User ID
+    key: string;
     value: User;
     indexes: {
       /** Index for querying users by their email (unique). */
@@ -57,7 +56,7 @@ interface JobAppDB extends DBSchema {
   };
   /** Object store for job applications (linking candidates to jobs). */
   applications: {
-    key: string; // Application ID
+    key: string;
     value: Application;
     indexes: {
       /** Index for querying applications by job ID. */
@@ -82,64 +81,51 @@ async function initDB(): Promise<IDBPDatabase<JobAppDB>> {
      * @param {number} oldVersion - The previous version number (0 if creating).
      * @param {number | null} newVersion - The new version number being upgraded to.
      * @param {IDBPTransaction<JobAppDB, ("jobs" | "jobConfiguration" | "candidates" | "users" | "applications")[], "versionchange">} transaction - The upgrade transaction.
-     * @param {IDBPVersionChangeEvent} event - The version change event.
      */
-    upgrade(db, oldVersion, newVersion, transaction, event) {
+    upgrade(db, oldVersion, newVersion, transaction) {
       console.log(`Upgrading DB from version ${oldVersion} to ${newVersion}`);
 
-      // --- Create/Update Object Stores ---
-
-      // Jobs (already exists, but good practice to keep the check)
       if (!db.objectStoreNames.contains("jobs")) {
         const jobStore = db.createObjectStore("jobs", { keyPath: "id" });
         jobStore.createIndex("by-slug", "slug");
         console.log("Created 'jobs' object store with 'by-slug' index.");
       }
 
-      // Job Configuration (already exists, structure is flexible enough)
       if (!db.objectStoreNames.contains("jobConfiguration")) {
-        // No keyPath, we use explicit keys ('applicationConfig', 'postingConfig')
         db.createObjectStore("jobConfiguration");
         console.log("Created 'jobConfiguration' object store.");
       }
 
-      // Candidates (already exists)
       if (!db.objectStoreNames.contains("candidates")) {
         db.createObjectStore("candidates", { keyPath: "id" });
         console.log("Created 'candidates' object store.");
       }
 
-      // Users (New in v2)
       if (!db.objectStoreNames.contains("users")) {
         const userStore = db.createObjectStore("users", { keyPath: "id" });
-        // Ensure emails are unique for login purposes
         userStore.createIndex("by-email", "email", { unique: true });
         console.log("Created 'users' object store with 'by-email' index.");
       }
 
-      // Applications (New in v2)
       if (!db.objectStoreNames.contains("applications")) {
         const applicationStore = db.createObjectStore("applications", {
           keyPath: "id",
-        }); // Using explicit ID
+        });
         applicationStore.createIndex("by-jobId", "jobId");
         applicationStore.createIndex("by-candidateId", "candidateId");
         console.log("Created 'applications' object store with indexes.");
       }
 
-      // --- Data Migration (Example: Ran when upgrading from v1 to v2) ---
       if (oldVersion < 2) {
         console.log("Running migration logic for v2...");
-        // Migrate old 'mainConfig' key to 'applicationConfig'
         const configStore = transaction.objectStore("jobConfiguration");
         configStore
           .get("mainConfig")
           .then((oldConfig) => {
             if (oldConfig) {
               console.log("Migrating old 'mainConfig' key...");
-              // Assume old config was application config and update its ID and add configType
               const newAppConfig: JobApplicationConfiguration = {
-                ...(oldConfig as any), // Cast or adjust based on old structure
+                ...(oldConfig as JobApplicationConfiguration),
                 id: "applicationConfig",
                 configType: "application",
               };
@@ -158,48 +144,77 @@ async function initDB(): Promise<IDBPDatabase<JobAppDB>> {
   return db;
 }
 
-// --- Service Functions ---
-
-// -- Jobs --
+/**
+ * Adds a new job posting to the 'jobs' object store.
+ * Ensures the job has a UUID if an ID is not provided.
+ * @param {Job} job - The job object to add.
+ * @returns {Promise<string>} A promise that resolves with the key (ID) of the added job.
+ */
 export async function addJob(job: Job): Promise<string> {
   const db = await initDB();
-  // Ensure job has an ID if not provided
   if (!job.id) job.id = uuidv4();
   return db.add("jobs", job);
 }
+/**
+ * Retrieves all job postings from the 'jobs' object store.
+ * @returns {Promise<Job[]>} A promise that resolves with an array of all job objects.
+ */
 export async function getAllJobs(): Promise<Job[]> {
   const db = await initDB();
   return db.getAll("jobs");
 }
+/**
+ * Retrieves a specific job posting by its ID.
+ * @param {string} id - The ID of the job to retrieve.
+ * @returns {Promise<Job | undefined>} A promise resolving to the Job object or undefined if not found.
+ */
 export async function getJobById(id: string): Promise<Job | undefined> {
   const db = await initDB();
   return db.get("jobs", id);
 }
-// Add updateJob, deleteJob etc. as needed
 
-// -- Job Configurations --
+/**
+ * Saves (adds or updates) the job application configuration.
+ * Uses the fixed key 'applicationConfig'.
+ * @param {JobApplicationConfiguration} config - The application configuration object.
+ * @returns {Promise<string>} A promise resolving to the key ('applicationConfig').
+ */
 export async function saveJobApplicationConfiguration(
   config: JobApplicationConfiguration
 ): Promise<string> {
   const db = await initDB();
-  config.id = "applicationConfig"; // Ensure ID matches key
+  config.id = "applicationConfig";
   config.configType = "application";
   return db.put("jobConfiguration", config, "applicationConfig");
 }
+/**
+ * Retrieves the job application configuration.
+ * @returns {Promise<JobApplicationConfiguration | JobPostingConfiguration | undefined>} A promise resolving to the configuration object or undefined.
+ */
 export async function getJobApplicationConfiguration(): Promise<
   JobApplicationConfiguration | JobPostingConfiguration | undefined
 > {
   const db = await initDB();
   return db.get("jobConfiguration", "applicationConfig");
 }
+/**
+ * Saves (adds or updates) the job posting configuration.
+ * Uses the fixed key 'postingConfig'.
+ * @param {JobPostingConfiguration} config - The posting configuration object.
+ * @returns {Promise<string>} A promise resolving to the key ('postingConfig').
+ */
 export async function saveJobPostingConfiguration(
   config: JobPostingConfiguration
 ): Promise<string> {
   const db = await initDB();
-  config.id = "postingConfig"; // Ensure ID matches key
+  config.id = "postingConfig";
   config.configType = "posting";
   return db.put("jobConfiguration", config, "postingConfig");
 }
+/**
+ * Retrieves the job posting configuration.
+ * @returns {Promise<JobPostingConfiguration | JobApplicationConfiguration | undefined>} A promise resolving to the configuration object or undefined.
+ */
 export async function getJobPostingConfiguration(): Promise<
   JobPostingConfiguration | JobApplicationConfiguration | undefined
 > {
@@ -207,31 +222,44 @@ export async function getJobPostingConfiguration(): Promise<
   return db.get("jobConfiguration", "postingConfig");
 }
 
-// -- Candidates --
+/**
+ * Adds a new candidate profile to the 'candidates' object store.
+ * Generates a UUID if an ID is not provided.
+ * @param {Candidate} candidate - The candidate object to add.
+ * @returns {Promise<string>} A promise that resolves with the key (ID) of the added candidate.
+ */
 export async function addCandidate(candidate: Candidate): Promise<string> {
   const db = await initDB();
-  // Consider generating UUID if candidate.id isn't provided
   if (!candidate.id) candidate.id = uuidv4();
   return db.add("candidates", candidate);
 }
+/**
+ * Retrieves all candidate profiles from the 'candidates' object store.
+ * @returns {Promise<Candidate[]>} A promise that resolves with an array of all candidate objects.
+ */
 export async function getAllCandidates(): Promise<Candidate[]> {
   const db = await initDB();
   return db.getAll("candidates");
 }
+/**
+ * Retrieves a specific candidate profile by its ID.
+ * @param {string} id - The ID of the candidate to retrieve.
+ * @returns {Promise<Candidate | undefined>} A promise resolving to the Candidate object or undefined if not found.
+ */
 export async function getCandidateById(
   id: string
 ): Promise<Candidate | undefined> {
   const db = await initDB();
   return db.get("candidates", id);
 }
-// Add updateCandidate, deleteCandidate etc. as needed
 
-// -- Users --
 /**
  * Adds a new user to the database. Assumes the password in the user object
- * has already been hashed using `hashPassword`.
- * @param user The user object with a hashed password.
- * @returns The ID of the added user.
+ * has already been hashed using `hashPassword`. Handles potential unique email constraint errors.
+ * Generates a UUID if an ID is not provided.
+ * @param {User} user - The user object with a hashed password.
+ * @returns {Promise<string>} The ID of the added user.
+ * @throws {Error} If the email already exists or if the user object lacks a hashed password.
  */
 export async function addUser(user: User): Promise<string> {
   const db = await initDB();
@@ -242,66 +270,99 @@ export async function addUser(user: User): Promise<string> {
   }
   try {
     return await db.add("users", user);
-  } catch (error: any) {
-    if (error.name === "ConstraintError") {
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === "ConstraintError") {
       console.error(`Error adding user: Email "${user.email}" already exists.`);
       throw new Error(`Email "${user.email}" already exists.`);
     } else {
       console.error("Error adding user:", error);
-      throw error; // Re-throw other errors
+      throw error;
     }
   }
 }
+/**
+ * Retrieves a user by their email address using the 'by-email' index.
+ * @param {string} email - The email address to search for.
+ * @returns {Promise<User | undefined>} A promise resolving to the User object or undefined if not found.
+ */
 export async function getUserByEmail(email: string): Promise<User | undefined> {
   const db = await initDB();
   return db.getFromIndex("users", "by-email", email);
 }
+/**
+ * Retrieves a user by their ID.
+ * @param {string} id - The ID of the user to retrieve.
+ * @returns {Promise<User | undefined>} A promise resolving to the User object or undefined if not found.
+ */
 export async function getUserById(id: string): Promise<User | undefined> {
   const db = await initDB();
   return db.get("users", id);
 }
-// Add updateUser, deleteUser etc. as needed
 
-// -- Applications --
+/**
+ * Adds a new job application to the 'applications' object store.
+ * Generates a UUID if an ID is not provided and sets the application date.
+ * @param {Application} application - The application object to add.
+ * @returns {Promise<string>} A promise resolving to the ID of the added application.
+ */
 export async function addApplication(
   application: Application
 ): Promise<string> {
   const db = await initDB();
-  // Ensure application has a unique ID
   if (!application.id) application.id = uuidv4();
-  application.applicationDate = new Date().toISOString(); // Set current date on creation
+  application.applicationDate = new Date().toISOString();
   return db.add("applications", application);
 }
+/**
+ * Retrieves all applications associated with a specific job ID using the 'by-jobId' index.
+ * @param {string} jobId - The ID of the job.
+ * @returns {Promise<Application[]>} A promise resolving to an array of matching Application objects.
+ */
 export async function getApplicationsForJob(
   jobId: string
 ): Promise<Application[]> {
   const db = await initDB();
   return db.getAllFromIndex("applications", "by-jobId", jobId);
 }
+/**
+ * Retrieves all applications associated with a specific candidate ID using the 'by-candidateId' index.
+ * @param {string} candidateId - The ID of the candidate.
+ * @returns {Promise<Application[]>} A promise resolving to an array of matching Application objects.
+ */
 export async function getApplicationsForCandidate(
   candidateId: string
 ): Promise<Application[]> {
   const db = await initDB();
   return db.getAllFromIndex("applications", "by-candidateId", candidateId);
 }
+/**
+ * Retrieves a specific application by its ID.
+ * @param {string} id - The ID of the application to retrieve.
+ * @returns {Promise<Application | undefined>} A promise resolving to the Application object or undefined if not found.
+ */
 export async function getApplicationById(
   id: string
 ): Promise<Application | undefined> {
   const db = await initDB();
   return db.get("applications", id);
 }
+/**
+ * Updates an existing application in the 'applications' object store.
+ * Uses 'put' which will overwrite or add the record.
+ * @param {Application} application - The application object with updated data. Must include the ID.
+ * @returns {Promise<string>} A promise resolving to the ID of the updated application.
+ */
 export async function updateApplication(
   application: Application
 ): Promise<string> {
   const db = await initDB();
   return db.put("applications", application);
 }
-// Add deleteApplication etc. as needed
 
 /**
  * Populates the IndexedDB database with initial data if stores are empty.
  * Uses a single transaction. Includes hashing for seeded user passwords.
- * @returns {Promise<void>}
+ * @returns {Promise<void>} A promise that resolves when seeding is complete or skipped, or rejects on error.
  */
 export async function seedInitialData(): Promise<void> {
   console.log("Attempting to seed initial data...");
@@ -319,7 +380,6 @@ export async function seedInitialData(): Promise<void> {
   };
 
   try {
-    // Seed Jobs
     const jobCount = await stores.jobs.count();
     if (jobCount === 0 && jobList.data.length > 0) {
       console.log("Seeding JobList...");
@@ -331,7 +391,6 @@ export async function seedInitialData(): Promise<void> {
       console.log("JobList data exists or is empty, skipping seed.");
     }
 
-    // Seed Job Application Configuration
     const appConfig = await stores.jobConfiguration.get("applicationConfig");
     if (!appConfig) {
       console.log("Seeding Job Application Configuration...");
@@ -347,14 +406,12 @@ export async function seedInitialData(): Promise<void> {
       console.log("Job Application Configuration exists, skipping seed.");
     }
 
-    // Seed Job Posting Configuration
     const postingConfig = await stores.jobConfiguration.get("postingConfig");
     if (!postingConfig && initialJobPostingConfig) {
-      // Check if imported config exists
       console.log("Seeding Job Posting Configuration...");
       const configKey = "postingConfig";
       const postingConfigToSave: JobPostingConfiguration = {
-        ...initialJobPostingConfig, // Use imported config
+        ...initialJobPostingConfig,
         id: configKey,
         configType: "posting",
       };
@@ -366,12 +423,10 @@ export async function seedInitialData(): Promise<void> {
       );
     }
 
-    // Seed Candidates
     const candidateCount = await stores.candidates.count();
     if (candidateCount === 0 && candidateList.data.length > 0) {
       console.log("Seeding Candidate List...");
       for (const candidate of candidateList.data) {
-        // Ensure candidate has an ID before adding
         if (!candidate.id) candidate.id = uuidv4();
         await stores.candidates.add(candidate);
       }
@@ -380,12 +435,10 @@ export async function seedInitialData(): Promise<void> {
       console.log("Candidate List data exists or is empty, skipping seed.");
     }
 
-    // Seed Users (e.g., a default admin) - NOW WITH HASHING
     const userCount = await stores.users.count();
     if (userCount === 0) {
       console.log("Seeding Default Admin User...");
-      // Use the actual hashPassword function for seeding too
-      const adminPasswordHash = await hashPassword("password"); // Example password 'password'
+      const adminPasswordHash = await hashPassword("password");
       const adminUser: User = {
         id: uuidv4(),
         email: "admin@example.com",
@@ -397,14 +450,14 @@ export async function seedInitialData(): Promise<void> {
       console.log("Default Admin User seeded.");
 
       if (candidateList.data.length > 0 && candidateList.data[0].id) {
-        const candidatePasswordHash = await hashPassword("password"); // Example password 'password'
+        const candidatePasswordHash = await hashPassword("password");
         const candidateUser: User = {
           id: uuidv4(),
-          email: "nadia.putri@example.com", // Match candidate data
+          email: "nadia.putri@example.com",
           name: "Nadia Putri",
           hashedPassword: candidatePasswordHash,
           role: "candidate",
-          candidateProfileId: candidateList.data[0].id, // Link to the first candidate
+          candidateProfileId: candidateList.data[0].id,
         };
         await stores.users.add(candidateUser);
         console.log("Sample Candidate User seeded.");
@@ -413,9 +466,7 @@ export async function seedInitialData(): Promise<void> {
       console.log("Users data exists, skipping seed.");
     }
 
-    // Seed Applications (link first candidate to first job)
     const appCount = await stores.applications.count();
-    // Ensure IDs exist before trying to link
     if (
       appCount === 0 &&
       jobList.data.length > 0 &&
@@ -447,23 +498,20 @@ export async function seedInitialData(): Promise<void> {
       console.error("Transaction error details:", tx.error);
     }
     console.log("Seeding failed, transaction aborted.");
-    // Avoid throwing here to prevent unhandled promise rejections if seed fails
   }
 }
 
-// --- Authentication Service Functions ---
-
 /**
- * Attempts to log in a user with email and password.
- * @param email The user's email.
- * @param plainPassword The user's plain text password.
- * @returns The User object if login is successful.
- * @throws Error if email is not found or password does not match.
+ * Attempts to log in a user with email and password. Verifies the password against the stored hash.
+ * @param {string} email - The user's email.
+ * @param {string} plainPassword - The user's plain text password.
+ * @returns {Promise<User>} The User object (excluding the hashedPassword) if login is successful.
+ * @throws {Error} If email is not found, password does not match, or the user account is improperly configured.
  */
 export async function loginUser(
   email: string,
   plainPassword: string
-): Promise<User> {
+): Promise<Omit<User, "hashedPassword">> {
   const user = await getUserByEmail(email);
 
   if (!user) {
@@ -473,7 +521,7 @@ export async function loginUser(
 
   if (!user.hashedPassword) {
     console.error(`Login failed: User "${email}" has no password set.`);
-    throw new Error("User account is not properly configured."); // Should not happen with current setup
+    throw new Error("User account is not properly configured.");
   }
 
   const isPasswordCorrect = await verifyPassword(
@@ -487,34 +535,32 @@ export async function loginUser(
   }
 
   console.log(`Login successful for user: ${user.email}`);
-  // Omit hashedPassword before returning user object to frontend state
-  const { hashedPassword, ...userWithoutPassword } = user;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { hashedPassword: _, ...userWithoutPassword } = user;
   return userWithoutPassword;
 }
 
 /**
  * Registers a new user. Hashes the password before adding to the database.
- * @param userData Object containing name, email, plainPassword, role, and optional candidateProfileId.
- * @returns The newly created User object (without the hashed password).
- * @throws Error if the email already exists or hashing fails.
+ * Checks for existing email addresses.
+ * @param {Omit<User, "id" | "hashedPassword"> & { plainPassword: string }} userData - Object containing name, email, plainPassword, role, and optional candidateProfileId.
+ * @returns {Promise<Omit<User, "hashedPassword">>} The newly created User object (without the hashed password).
+ * @throws {Error} If the email already exists, hashing fails, or database add fails.
  */
 export async function registerUser(
   userData: Omit<User, "id" | "hashedPassword"> & { plainPassword: string }
 ): Promise<Omit<User, "hashedPassword">> {
   const { email, plainPassword, name, role, candidateProfileId } = userData;
 
-  // Check if user already exists
   const existingUser = await getUserByEmail(email);
   if (existingUser) {
     throw new Error(`Email "${email}" is already registered.`);
   }
 
-  // Hash the password
   const hashedPassword = await hashPassword(plainPassword);
 
-  // Create the new user object
   const newUser: User = {
-    id: uuidv4(), // Generate ID here
+    id: uuidv4(),
     email,
     name,
     hashedPassword,
@@ -522,22 +568,18 @@ export async function registerUser(
     candidateProfileId: role === "candidate" ? candidateProfileId : undefined,
   };
 
-  // Add user to the database (addUser handles potential constraint errors)
   await addUser(newUser);
 
   console.log(`Registration successful for user: ${newUser.email}`);
-  // Return the user object without the hash
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { hashedPassword: _, ...userWithoutPassword } = newUser;
   return userWithoutPassword;
 }
 
-// --- Password Hashing Helpers (Client-Side using Web Crypto API) ---
-// IMPORTANT: Read security note above. Not for production use without server-side handling.
-
 /**
  * Converts an ArrayBuffer to a hexadecimal string.
- * @param buffer The ArrayBuffer to convert.
- * @returns A hexadecimal string representation.
+ * @param {ArrayBuffer} buffer - The ArrayBuffer to convert.
+ * @returns {string} A hexadecimal string representation.
  */
 function bufferToHex(buffer: ArrayBuffer): string {
   return Array.prototype.map
@@ -547,10 +589,9 @@ function bufferToHex(buffer: ArrayBuffer): string {
 
 /**
  * Hashes a password using SHA-256 via the Web Crypto API.
- * NOTE: This is basic hashing without salting or key stretching (like bcrypt/Argon2).
- * It's better than plain text but NOT cryptographically secure against modern attacks.
- * @param password The plain text password.
- * @returns A promise resolving to the SHA-256 hash as a hex string.
+ * NOTE: This is basic hashing without salting or key stretching. Not suitable for production security.
+ * @param {string} password - The plain text password.
+ * @returns {Promise<string>} A promise resolving to the SHA-256 hash as a hex string.
  */
 export async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -559,21 +600,21 @@ export async function hashPassword(password: string): Promise<string> {
   const hashHex = bufferToHex(hashBuffer);
   console.log(
     `Hashing password "${password}" to ${hashHex.substring(0, 10)}...`
-  ); // Log for demo
+  );
   return hashHex;
 }
 
 /**
  * Verifies a plain text password against a stored SHA-256 hash.
- * @param plainPassword The password entered by the user.
- * @param storedHash The hash retrieved from the database.
- * @returns A promise resolving to true if the password matches the hash, false otherwise.
+ * @param {string} plainPassword - The password entered by the user.
+ * @param {string} storedHash - The hash retrieved from the database.
+ * @returns {Promise<boolean>} A promise resolving to true if the password matches the hash, false otherwise.
  */
 export async function verifyPassword(
   plainPassword: string,
   storedHash: string
 ): Promise<boolean> {
-  if (!storedHash) return false; // Cannot verify if no hash is stored
+  if (!storedHash) return false;
   const hashOfInput = await hashPassword(plainPassword);
   return hashOfInput === storedHash;
 }
