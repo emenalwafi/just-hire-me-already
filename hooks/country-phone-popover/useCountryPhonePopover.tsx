@@ -319,7 +319,6 @@ export function useCountryPhonePopover({
                   “{searchTerm}”
                 </strong>
                 <span className="text-neutral-700 text-sm">
-                  {" "}
                   tidak ditemukan
                 </span>
               </div>

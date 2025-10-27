@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@iconscout/react-unicons": "^2.2.5",
+    "@tanstack/react-table": "^8.21.3",
     "country-flag-icons": "^1.5.21",
     "date-fns": "^4.1.0",
     "libphonenumber-js": "^1.12.25",

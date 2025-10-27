@@ -600,8 +600,7 @@ export function useDatePickerPopover({
                     : "Previous year"
                 }
               >
-                {" "}
-                <UilAngleDoubleLeft size="24" />{" "}
+                <UilAngleDoubleLeft size="24" />
               </button>
               {view === "day" && (
                 <button
@@ -611,8 +610,7 @@ export function useDatePickerPopover({
                   className={getNavButtonClasses(!canGoPrevMonth)}
                   aria-label="Previous month"
                 >
-                  {" "}
-                  <UilAngleLeft size="24" />{" "}
+                  <UilAngleLeft size="24" />
                 </button>
               )}
             </div>
@@ -620,7 +618,6 @@ export function useDatePickerPopover({
             <div className="flex justify-start items-center gap-4">
               {view === "day" && (
                 <>
-                  {" "}
                   <button
                     type="button"
                     onClick={() => setView("month")}
@@ -630,9 +627,8 @@ export function useDatePickerPopover({
                       "yyyy"
                     )}`}
                   >
-                    {" "}
-                    {format(currentDate, "MMM")}{" "}
-                  </button>{" "}
+                    {format(currentDate, "MMM")}
+                  </button>
                   <button
                     type="button"
                     onClick={() => setView("year")}
@@ -642,9 +638,8 @@ export function useDatePickerPopover({
                       "yyyy"
                     )}, select year`}
                   >
-                    {" "}
-                    {format(currentDate, "yyyy")}{" "}
-                  </button>{" "}
+                    {format(currentDate, "yyyy")}
+                  </button>
                 </>
               )}
               {view === "month" && (
@@ -657,8 +652,7 @@ export function useDatePickerPopover({
                     "yyyy"
                   )}, select year`}
                 >
-                  {" "}
-                  {format(currentDate, "yyyy")}{" "}
+                  {format(currentDate, "yyyy")}
                 </button>
               )}
               {view === "year" && (
@@ -668,8 +662,7 @@ export function useDatePickerPopover({
                   className="cursor-pointer justify-start text-neutral-90 text-lg font-bold hover:text-primary-main focus:outline-none focus:ring-1 focus:ring-primary-focus rounded px-1"
                   aria-label={`Current decade ${currentViewDecadeStart}-${currentViewDecadeEnd}, select decade range`}
                 >
-                  {" "}
-                  {`${currentViewDecadeStart} - ${currentViewDecadeEnd}`}{" "}
+                  {`${currentViewDecadeStart} - ${currentViewDecadeEnd}`}
                 </button>
               )}
               {view === "decade" && (
@@ -686,8 +679,7 @@ export function useDatePickerPopover({
                   className={getNavButtonClasses(!canGoNextMonth)}
                   aria-label="Next month"
                 >
-                  {" "}
-                  <UilAngleRight size="24" />{" "}
+                  <UilAngleRight size="24" />
                 </button>
               )}
               <button
@@ -717,8 +709,7 @@ export function useDatePickerPopover({
                     : "Next year"
                 }
               >
-                {" "}
-                <UilAngleDoubleRight size="24" />{" "}
+                <UilAngleDoubleRight size="24" />
               </button>
             </div>
           </div>
@@ -728,9 +719,7 @@ export function useDatePickerPopover({
             {/* Day View */}
             {view === "day" && (
               <>
-                {" "}
                 <div className="self-stretch inline-flex justify-start items-start gap-2">
-                  {" "}
                   {daysOfWeek.map((day, index) => (
                     <div
                       key={`${day}-${index}`}
@@ -741,13 +730,12 @@ export function useDatePickerPopover({
                     </div>
                   ))}
                   <div className="w-0"></div>
-                </div>{" "}
+                </div>
                 {calendarDays.map((row, rowIndex) => (
                   <div
                     key={rowIndex}
                     className="self-stretch inline-flex justify-start items-start gap-2"
                   >
-                    {" "}
                     {row.map((day, dayIndex) => {
                       const isSelected =
                         selectedDate && isSameDay(day, selectedDate);
@@ -795,21 +783,19 @@ export function useDatePickerPopover({
                           }
                           aria-pressed={isSelected || false}
                         >
-                          {" "}
                           <div className={dayTextClasses}>
                             {format(day, "d")}
-                          </div>{" "}
+                          </div>
                         </button>
                       );
-                    })}{" "}
+                    })}
                   </div>
-                ))}{" "}
+                ))}
               </>
             )}
             {/* Month View */}
             {view === "month" && (
               <div className="grid grid-cols-3 gap-2 w-full">
-                {" "}
                 {monthsOfYear.map((monthName, monthIndex) => {
                   const isCurrentSelectedMonth =
                     getMonth(currentDate) === monthIndex;
@@ -848,19 +834,15 @@ export function useDatePickerPopover({
                           : `Select ${monthName} ${getYear(currentDate)}`
                       }
                     >
-                      {" "}
-                      <div className="text-center text-base">
-                        {monthName}
-                      </div>{" "}
+                      <div className="text-center text-base">{monthName}</div>
                     </button>
                   );
-                })}{" "}
+                })}
               </div>
             )}
             {/* Year View */}
             {view === "year" && (
               <div className="grid grid-cols-3 gap-2 w-full">
-                {" "}
                 {calendarYears.flat().map((yearDate) => {
                   const year = getYear(yearDate);
                   const isCurrentSelectedYear = getYear(currentDate) === year;
@@ -917,17 +899,15 @@ export function useDatePickerPopover({
                       }
                       aria-pressed={isCurrentSelectedYear && isSelectableYear}
                     >
-                      {" "}
-                      <div className={yearTextClasses}>{year}</div>{" "}
+                      <div className={yearTextClasses}>{year}</div>
                     </button>
                   );
-                })}{" "}
+                })}
               </div>
             )}
             {/* Decade View */}
             {view === "decade" && (
               <div className="grid grid-cols-3 gap-2 w-full">
-                {" "}
                 {calendarDecades.flat().map((decade) => {
                   const isCurrentDecadeRange =
                     currentViewDecadeStart >= decade.start &&
@@ -970,8 +950,7 @@ export function useDatePickerPopover({
                       }
                       aria-pressed={isCurrentDecadeRange && isSelectableDecade}
                     >
-                      {" "}
-                      {`${decade.start}-${decade.end}`}{" "}
+                      {`${decade.start}-${decade.end}`}
                     </button>
                   );
                 })}
