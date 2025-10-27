@@ -1,11 +1,24 @@
-import { openDB, DBSchema, IDBPDatabase } from "idb";
-import { Job, JobConfiguration, Candidate } from "@/types/dbTypes";
-import { jobList, jobConfiguration, candidateList } from "@/data/initialData";
+import { openDB, DBSchema, IDBPDatabase, IDBPTransaction } from "idb";
+import {
+  Job,
+  JobApplicationConfiguration, // Updated type
+  JobPostingConfiguration, // New type
+  Candidate,
+  User, // New type
+  Application, // New type
+} from "@/types/dbTypes";
+import {
+  jobList,
+  jobConfiguration as initialAppConfig, // Rename imported variable
+  candidateList,
+  initialJobPostingConfig, // Import the new initial posting config
+} from "@/data/initialData";
+import { v4 as uuidv4 } from "uuid"; // Import uuid for generating unique IDs
 
 /** The name of the IndexedDB database. */
 const DB_NAME = "JobAppData";
-/** The current version of the IndexedDB database schema. */
-const DB_VERSION = 1;
+/** The current version of the IndexedDB database schema. Increment version for schema changes. */
+const DB_VERSION = 2; // Incremented version
 
 /**
  * Defines the schema structure for the Job Application IndexedDB database.
@@ -14,30 +27,44 @@ const DB_VERSION = 1;
 interface JobAppDB extends DBSchema {
   /** Object store for job postings. */
   jobs: {
-    /** The key type (job ID string). */
     key: string;
-    /** The value type (Job object). */
     value: Job;
-    /** Indexes for querying jobs. */
     indexes: {
-      /** Index for querying jobs by their slug. */
       "by-slug": string;
     };
   };
-  /** Object store for job configuration (e.g., application form structure). */
+  /** Object store for job configurations (application form and posting form). */
   jobConfiguration: {
-    /** The key type (using a fixed string like 'mainConfig'). */
+    /** The key type (using fixed strings like 'applicationConfig', 'postingConfig'). */
     key: string;
-    /** The value type (JobConfiguration object). */
-    value: JobConfiguration;
+    /** The value type (either Application or Posting configuration). */
+    value: JobApplicationConfiguration | JobPostingConfiguration;
+    // No indexes needed if fetching by known fixed keys
   };
   /** Object store for candidate profiles. */
   candidates: {
-    /** The key type (candidate ID string). */
     key: string;
-    /** The value type (Candidate object). */
     value: Candidate;
-    // indexes: { 'by-name': string }; // Example index, complex for nested arrays
+  };
+  /** Object store for user accounts. */
+  users: {
+    key: string; // User ID
+    value: User;
+    indexes: {
+      /** Index for querying users by their email (unique). */
+      "by-email": string;
+    };
+  };
+  /** Object store for job applications (linking candidates to jobs). */
+  applications: {
+    key: string; // Application ID
+    value: Application;
+    indexes: {
+      /** Index for querying applications by job ID. */
+      "by-jobId": string;
+      /** Index for querying applications by candidate ID. */
+      "by-candidateId": string;
+    };
   };
 }
 
@@ -54,34 +81,76 @@ async function initDB(): Promise<IDBPDatabase<JobAppDB>> {
      * @param {IDBPDatabase<JobAppDB>} db - The database instance during upgrade.
      * @param {number} oldVersion - The previous version number (0 if creating).
      * @param {number | null} newVersion - The new version number being upgraded to.
-     * @param {IDBPTransaction<JobAppDB, ("jobs" | "jobConfiguration" | "candidates")[], "versionchange">} transaction - The upgrade transaction.
+     * @param {IDBPTransaction<JobAppDB, ("jobs" | "jobConfiguration" | "candidates" | "users" | "applications")[], "versionchange">} transaction - The upgrade transaction.
+     * @param {IDBPVersionChangeEvent} event - The version change event.
      */
-    upgrade(db, oldVersion, newVersion, transaction) {
+    upgrade(db, oldVersion, newVersion, transaction, event) {
       console.log(`Upgrading DB from version ${oldVersion} to ${newVersion}`);
 
-      // Create 'jobs' object store if it doesn't exist
+      // --- Create/Update Object Stores ---
+
+      // Jobs (already exists, but good practice to keep the check)
       if (!db.objectStoreNames.contains("jobs")) {
-        const jobStore = db.createObjectStore("jobs", {
-          keyPath: "id", // Use the 'id' field as the primary key
-        });
-        // Create an index on the 'slug' field
+        const jobStore = db.createObjectStore("jobs", { keyPath: "id" });
         jobStore.createIndex("by-slug", "slug");
         console.log("Created 'jobs' object store with 'by-slug' index.");
       }
-      // Create 'jobConfiguration' object store if it doesn't exist
+
+      // Job Configuration (already exists, structure is flexible enough)
       if (!db.objectStoreNames.contains("jobConfiguration")) {
-        // No keyPath needed if we use explicit keys ('mainConfig')
+        // No keyPath, we use explicit keys ('applicationConfig', 'postingConfig')
         db.createObjectStore("jobConfiguration");
         console.log("Created 'jobConfiguration' object store.");
       }
-      // Create 'candidates' object store if it doesn't exist
+
+      // Candidates (already exists)
       if (!db.objectStoreNames.contains("candidates")) {
-        const candidateStore = db.createObjectStore("candidates", {
-          keyPath: "id", // Use the 'id' field as the primary key
-        });
-        // Example: Add indexes if needed later
-        // candidateStore.createIndex('by-email', 'attributes.value'); // More complex indexing
+        db.createObjectStore("candidates", { keyPath: "id" });
         console.log("Created 'candidates' object store.");
+      }
+
+      // Users (New in v2)
+      if (!db.objectStoreNames.contains("users")) {
+        const userStore = db.createObjectStore("users", { keyPath: "id" });
+        // Ensure emails are unique for login purposes
+        userStore.createIndex("by-email", "email", { unique: true });
+        console.log("Created 'users' object store with 'by-email' index.");
+      }
+
+      // Applications (New in v2)
+      if (!db.objectStoreNames.contains("applications")) {
+        const applicationStore = db.createObjectStore("applications", {
+          keyPath: "id",
+        }); // Using explicit ID
+        applicationStore.createIndex("by-jobId", "jobId");
+        applicationStore.createIndex("by-candidateId", "candidateId");
+        console.log("Created 'applications' object store with indexes.");
+      }
+
+      // --- Data Migration (Example: Ran when upgrading from v1 to v2) ---
+      if (oldVersion < 2) {
+        console.log("Running migration logic for v2...");
+        // Migrate old 'mainConfig' key to 'applicationConfig'
+        const configStore = transaction.objectStore("jobConfiguration");
+        configStore
+          .get("mainConfig")
+          .then((oldConfig) => {
+            if (oldConfig) {
+              console.log("Migrating old 'mainConfig' key...");
+              // Assume old config was application config and update its ID and add configType
+              const newAppConfig: JobApplicationConfiguration = {
+                ...(oldConfig as any), // Cast or adjust based on old structure
+                id: "applicationConfig",
+                configType: "application",
+              };
+              configStore.put(newAppConfig, "applicationConfig");
+              configStore.delete("mainConfig");
+              console.log(
+                "Migration complete: 'mainConfig' -> 'applicationConfig'"
+              );
+            }
+          })
+          .catch((err) => console.error("Error during config migration:", err));
       }
       console.log("DB Upgrade finished");
     },
@@ -89,141 +158,326 @@ async function initDB(): Promise<IDBPDatabase<JobAppDB>> {
   return db;
 }
 
-/**
- * Adds a new job posting to the 'jobs' object store.
- * @param {Job} job - The job object to add.
- * @returns {Promise<string>} A promise that resolves with the key (ID) of the added job.
- */
+// --- Service Functions ---
+
+// -- Jobs --
 export async function addJob(job: Job): Promise<string> {
   const db = await initDB();
   return db.add("jobs", job);
 }
-
-/**
- * Saves (adds or updates) the main job configuration in the 'jobConfiguration' object store.
- * Uses a fixed key 'mainConfig'.
- * @param {JobConfiguration} config - The job configuration object to save.
- * @returns {Promise<string>} A promise that resolves with the key ('mainConfig') used to save the configuration.
- */
-export async function saveJobConfiguration(
-  config: JobConfiguration
-): Promise<string> {
-  const db = await initDB();
-  const configKey = "mainConfig"; // Fixed key for the single configuration object
-  config.id = configKey; // Assign ID for consistency if needed within the object itself
-  // Use 'put' to either add or update the configuration at the specified key
-  return db.put("jobConfiguration", config, configKey);
-}
-
-/**
- * Adds a new candidate profile to the 'candidates' object store.
- * @param {Candidate} candidate - The candidate object to add.
- * @returns {Promise<string>} A promise that resolves with the key (ID) of the added candidate.
- */
-export async function addCandidate(candidate: Candidate): Promise<string> {
-  const db = await initDB();
-  return db.add("candidates", candidate);
-}
-
-/**
- * Retrieves all job postings from the 'jobs' object store.
- * @returns {Promise<Job[]>} A promise that resolves with an array of all job objects.
- */
 export async function getAllJobs(): Promise<Job[]> {
   const db = await initDB();
   return db.getAll("jobs");
 }
+// Add getJobById, updateJob, deleteJob etc. as needed
 
-/**
- * Retrieves the main job configuration from the 'jobConfiguration' object store.
- * @returns {Promise<JobConfiguration | undefined>} A promise that resolves with the job configuration object,
- * or undefined if it hasn't been saved yet.
- */
-export async function getJobConfiguration(): Promise<
-  JobConfiguration | undefined
+// -- Job Configurations --
+export async function saveJobApplicationConfiguration(
+  config: JobApplicationConfiguration
+): Promise<string> {
+  const db = await initDB();
+  config.id = "applicationConfig"; // Ensure ID matches key
+  config.configType = "application";
+  return db.put("jobConfiguration", config, "applicationConfig");
+}
+export async function getJobApplicationConfiguration(): Promise<
+  JobApplicationConfiguration | JobPostingConfiguration | undefined
 > {
   const db = await initDB();
-  return db.get("jobConfiguration", "mainConfig"); // Fetch using the fixed key
+  return db.get("jobConfiguration", "applicationConfig");
+}
+export async function saveJobPostingConfiguration(
+  config: JobPostingConfiguration
+): Promise<string> {
+  const db = await initDB();
+  config.id = "postingConfig"; // Ensure ID matches key
+  config.configType = "posting";
+  return db.put("jobConfiguration", config, "postingConfig");
+}
+export async function getJobPostingConfiguration(): Promise<
+  JobPostingConfiguration | JobApplicationConfiguration | undefined
+> {
+  const db = await initDB();
+  return db.get("jobConfiguration", "postingConfig");
 }
 
-/**
- * Retrieves all candidate profiles from the 'candidates' object store.
- * @returns {Promise<Candidate[]>} A promise that resolves with an array of all candidate objects.
- */
+// -- Candidates --
+export async function addCandidate(candidate: Candidate): Promise<string> {
+  const db = await initDB();
+  // Consider generating UUID if candidate.id isn't provided
+  if (!candidate.id) candidate.id = uuidv4();
+  return db.add("candidates", candidate);
+}
 export async function getAllCandidates(): Promise<Candidate[]> {
   const db = await initDB();
   return db.getAll("candidates");
 }
+export async function getCandidateById(
+  id: string
+): Promise<Candidate | undefined> {
+  const db = await initDB();
+  return db.get("candidates", id);
+}
+// Add updateCandidate, deleteCandidate etc. as needed
+
+// -- Users --
+/**
+ * Adds a new user to the database. Assumes the password in the user object
+ * has already been hashed using `hashPassword`.
+ * @param user The user object with a hashed password.
+ * @returns The ID of the added user.
+ */
+export async function addUser(user: User): Promise<string> {
+  const db = await initDB();
+  if (!user.id) user.id = uuidv4();
+  if (!user.hashedPassword) {
+    console.error("Attempted to add user without a hashed password!");
+    throw new Error("User password must be hashed before adding.");
+  }
+  return db.add("users", user);
+}
+export async function getUserByEmail(email: string): Promise<User | undefined> {
+  const db = await initDB();
+  return db.getFromIndex("users", "by-email", email);
+}
+export async function getUserById(id: string): Promise<User | undefined> {
+  const db = await initDB();
+  return db.get("users", id);
+}
+// Add updateUser, deleteUser etc. as needed
+
+// -- Applications --
+export async function addApplication(
+  application: Application
+): Promise<string> {
+  const db = await initDB();
+  // Ensure application has a unique ID
+  if (!application.id) application.id = uuidv4();
+  application.applicationDate = new Date().toISOString(); // Set current date on creation
+  return db.add("applications", application);
+}
+export async function getApplicationsForJob(
+  jobId: string
+): Promise<Application[]> {
+  const db = await initDB();
+  return db.getAllFromIndex("applications", "by-jobId", jobId);
+}
+export async function getApplicationsForCandidate(
+  candidateId: string
+): Promise<Application[]> {
+  const db = await initDB();
+  return db.getAllFromIndex("applications", "by-candidateId", candidateId);
+}
+export async function getApplicationById(
+  id: string
+): Promise<Application | undefined> {
+  const db = await initDB();
+  return db.get("applications", id);
+}
+export async function updateApplication(
+  application: Application
+): Promise<string> {
+  const db = await initDB();
+  return db.put("applications", application);
+}
+// Add deleteApplication etc. as needed
 
 /**
- * Populates the IndexedDB database with initial data (jobs, configuration, candidates)
- * if the respective object stores are empty. Uses a single transaction for efficiency.
- * @returns {Promise<void>} A promise that resolves when the seeding process is complete or skipped.
+ * Populates the IndexedDB database with initial data if stores are empty.
+ * Uses a single transaction. Includes hashing for seeded user passwords.
+ * @returns {Promise<void>}
  */
 export async function seedInitialData(): Promise<void> {
   console.log("Attempting to seed initial data...");
   const db = await initDB();
-  // Start a readwrite transaction encompassing all stores to be seeded
   const tx = db.transaction(
-    ["jobs", "jobConfiguration", "candidates"],
+    ["jobs", "jobConfiguration", "candidates", "users", "applications"],
     "readwrite"
   );
-  // Get references to the object stores within the transaction
   const stores = {
     jobs: tx.objectStore("jobs"),
     jobConfiguration: tx.objectStore("jobConfiguration"),
     candidates: tx.objectStore("candidates"),
+    users: tx.objectStore("users"),
+    applications: tx.objectStore("applications"),
   };
 
   try {
-    // Seed Jobs only if the store is empty
+    // Seed Jobs
     const jobCount = await stores.jobs.count();
-    if (jobCount === 0) {
+    if (jobCount === 0 && jobList.data.length > 0) {
       console.log("Seeding JobList...");
       for (const job of jobList.data) {
-        await stores.jobs.add(job); // Use the store from the transaction
+        await stores.jobs.add(job);
       }
       console.log("JobList seeded.");
     } else {
-      console.log("JobList data already exists, skipping seed.");
+      console.log("JobList data exists or is empty, skipping seed.");
     }
 
-    // Seed Job Configuration only if it doesn't exist
-    const config = await stores.jobConfiguration.get("mainConfig");
-    if (!config) {
-      console.log("Seeding Job Configuration...");
-      const configKey = "mainConfig";
-      jobConfiguration.id = configKey;
-      await stores.jobConfiguration.put(jobConfiguration, configKey); // Use the store from the transaction
-      console.log("Job Configuration seeded.");
+    // Seed Job Application Configuration
+    const appConfig = await stores.jobConfiguration.get("applicationConfig");
+    if (!appConfig) {
+      console.log("Seeding Job Application Configuration...");
+      const configKey = "applicationConfig";
+      const appConfigToSave: JobApplicationConfiguration = {
+        ...initialAppConfig,
+        id: configKey,
+        configType: "application",
+      };
+      await stores.jobConfiguration.put(appConfigToSave, configKey);
+      console.log("Job Application Configuration seeded.");
     } else {
-      console.log("Job Configuration already exists, skipping seed.");
+      console.log("Job Application Configuration exists, skipping seed.");
     }
 
-    // Seed Candidates only if the store is empty
+    // Seed Job Posting Configuration
+    const postingConfig = await stores.jobConfiguration.get("postingConfig");
+    if (!postingConfig && initialJobPostingConfig) {
+      // Check if imported config exists
+      console.log("Seeding Job Posting Configuration...");
+      const configKey = "postingConfig";
+      const postingConfigToSave: JobPostingConfiguration = {
+        ...initialJobPostingConfig, // Use imported config
+        id: configKey,
+        configType: "posting",
+      };
+      await stores.jobConfiguration.put(postingConfigToSave, configKey);
+      console.log("Job Posting Configuration seeded.");
+    } else {
+      console.log(
+        "Job Posting Configuration exists or not provided, skipping seed."
+      );
+    }
+
+    // Seed Candidates
     const candidateCount = await stores.candidates.count();
-    if (candidateCount === 0) {
+    if (candidateCount === 0 && candidateList.data.length > 0) {
       console.log("Seeding Candidate List...");
       for (const candidate of candidateList.data) {
-        await stores.candidates.add(candidate); // Use the store from the transaction
+        // Ensure candidate has an ID before adding
+        if (!candidate.id) candidate.id = uuidv4();
+        await stores.candidates.add(candidate);
       }
       console.log("Candidate List seeded.");
     } else {
-      console.log("Candidate List data already exists, skipping seed.");
+      console.log("Candidate List data exists or is empty, skipping seed.");
     }
 
-    // Wait for the transaction to complete successfully
+    // Seed Users (e.g., a default admin) - NOW WITH HASHING
+    const userCount = await stores.users.count();
+    if (userCount === 0) {
+      console.log("Seeding Default Admin User...");
+      // Use the actual hashPassword function for seeding too
+      const adminPasswordHash = await hashPassword("password"); // Example password 'password'
+      const adminUser: User = {
+        id: uuidv4(),
+        email: "admin@example.com",
+        name: "Admin User",
+        hashedPassword: adminPasswordHash,
+        role: "admin",
+      };
+      await stores.users.add(adminUser);
+      console.log("Default Admin User seeded.");
+
+      if (candidateList.data.length > 0) {
+        const candidatePasswordHash = await hashPassword("password"); // Example password 'password'
+        const candidateUser: User = {
+          id: uuidv4(),
+          email: "nadia.putri@example.com", // Match candidate data
+          name: "Nadia Putri",
+          hashedPassword: candidatePasswordHash,
+          role: "candidate",
+          candidateProfileId: candidateList.data[0].id, // Link to the first candidate
+        };
+        await stores.users.add(candidateUser);
+        console.log("Sample Candidate User seeded.");
+      }
+    } else {
+      console.log("Users data exists, skipping seed.");
+    }
+
+    // Seed Applications (link first candidate to first job)
+    const appCount = await stores.applications.count();
+    // Ensure IDs exist before trying to link
+    if (
+      appCount === 0 &&
+      jobList.data.length > 0 &&
+      candidateList.data.length > 0 &&
+      jobList.data[0].id &&
+      candidateList.data[0].id
+    ) {
+      console.log("Seeding Sample Application...");
+      const sampleApp: Application = {
+        id: uuidv4(),
+        jobId: jobList.data[0].id,
+        candidateId: candidateList.data[0].id,
+        applicationDate: new Date().toISOString(),
+        status: "applied",
+      };
+      await stores.applications.add(sampleApp);
+      console.log("Sample Application seeded.");
+    } else {
+      console.log(
+        "Applications data exists or prerequisites missing, skipping seed."
+      );
+    }
+
     await tx.done;
     console.log("Seeding complete.");
   } catch (error) {
     console.error("Error during seeding transaction:", error);
-    // Log specific transaction error if available
     if (tx.error) {
       console.error("Transaction error details:", tx.error);
     }
-    // Transaction automatically aborts on any error within the try block
     console.log("Seeding failed, transaction aborted.");
-    // Optionally re-throw the error if the caller needs to handle it
-    // throw error;
+    // Avoid throwing here to prevent unhandled promise rejections if seed fails
   }
+}
+
+// --- Password Hashing Helpers (Client-Side using Web Crypto API) ---
+// IMPORTANT: Read security note above. Not for production use without server-side handling.
+
+/**
+ * Converts an ArrayBuffer to a hexadecimal string.
+ * @param buffer The ArrayBuffer to convert.
+ * @returns A hexadecimal string representation.
+ */
+function bufferToHex(buffer: ArrayBuffer): string {
+  return Array.prototype.map
+    .call(new Uint8Array(buffer), (x) => ("00" + x.toString(16)).slice(-2))
+    .join("");
+}
+
+/**
+ * Hashes a password using SHA-256 via the Web Crypto API.
+ * NOTE: This is basic hashing without salting or key stretching (like bcrypt/Argon2).
+ * It's better than plain text but NOT cryptographically secure against modern attacks.
+ * @param password The plain text password.
+ * @returns A promise resolving to the SHA-256 hash as a hex string.
+ */
+export async function hashPassword(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashHex = bufferToHex(hashBuffer);
+  console.log(
+    `Hashing password "${password}" to ${hashHex.substring(0, 10)}...`
+  ); // Log for demo
+  return hashHex;
+}
+
+/**
+ * Verifies a plain text password against a stored SHA-256 hash.
+ * @param plainPassword The password entered by the user.
+ * @param storedHash The hash retrieved from the database.
+ * @returns A promise resolving to true if the password matches the hash, false otherwise.
+ */
+export async function verifyPassword(
+  plainPassword: string,
+  storedHash: string
+): Promise<boolean> {
+  if (!storedHash) return false; // Cannot verify if no hash is stored
+  const hashOfInput = await hashPassword(plainPassword);
+  return hashOfInput === storedHash;
 }

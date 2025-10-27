@@ -46,7 +46,7 @@ export interface Job {
  * Defines the structure and validation rules for a single field
  * within a job application form configuration.
  */
-export interface JobConfigurationField {
+export interface JobApplicationFieldConfig {
   /** The unique key or identifier for this field (e.g., "fullName", "resumeFile"). */
   key: string;
   /** Validation rules for the field. */
@@ -60,25 +60,51 @@ export interface JobConfigurationField {
  * Represents a section within a job application form configuration,
  * containing a title and a list of fields.
  */
-export interface JobConfigurationSection {
+export interface JobApplicationSection {
   /** The title displayed for this section of the form (e.g., "Personal Information", "Work Experience"). */
   title: string;
   /** An array of fields included in this section. */
-  fields: JobConfigurationField[];
+  fields: JobApplicationFieldConfig[];
 }
 
 /**
- * Represents the overall configuration for a job, specifically
- * defining the structure of its application form.
+ * Represents the configuration for a job's **application** form.
  */
-export interface JobConfiguration {
-  /** Optional unique identifier for this configuration document. */
-  id?: string; // Add an ID for the key, e.g., 'mainConfig'
+export interface JobApplicationConfiguration {
+  /** Unique identifier for this configuration document (use fixed key "applicationConfig"). */
+  id: "applicationConfig";
+  /** Type identifier for distinguishing configuration types. */
+  configType: "application";
   /** Configuration details for the job's application form. */
   application_form: {
     /** An array of sections that make up the application form. */
-    sections: JobConfigurationSection[];
+    sections: JobApplicationSection[];
   };
+}
+
+/**
+ * Represents the configuration for a field when an admin is **posting** a job.
+ */
+export interface JobPostingFieldConfig {
+  key: string; // e.g., 'title', 'description', 'salaryMin', 'salaryMax', 'location'
+  label: string; // e.g., 'Job Title', 'Job Description'
+  type: "text" | "textarea" | "number" | "currency" | "select"; // Input type hint
+  required: boolean;
+  options?: { value: string; label: string }[]; // For select types
+  placeholder?: string;
+  // Add other relevant properties like validation rules, order etc.
+}
+
+/**
+ * Represents the configuration for the form used by admins to **post** a new job.
+ */
+export interface JobPostingConfiguration {
+  /** Unique identifier for this configuration document (use fixed key "postingConfig"). */
+  id: "postingConfig";
+  /** Type identifier for distinguishing configuration types. */
+  configType: "posting";
+  /** An array defining the fields in the job posting form. */
+  fields: JobPostingFieldConfig[];
 }
 
 /**
@@ -96,11 +122,51 @@ export interface CandidateAttribute {
 }
 
 /**
- * Represents a job candidate.
+ * Represents a job candidate profile.
  */
 export interface Candidate {
-  /** Unique identifier for the candidate. */
+  /** Unique identifier for the candidate profile. */
   id: string; // Will be the key
   /** An array of attributes associated with the candidate. */
   attributes: CandidateAttribute[];
+}
+
+/**
+ * Represents a user account in the system.
+ */
+export interface User {
+  /** Unique user ID (e.g., generated UUID). */
+  id: string; // Will be the key path
+  /** Login email (must be unique). */
+  email: string; // Indexed
+  /** User's display name. */
+  name: string;
+  /** Store hashed passwords, NEVER plain text. Optional depending on auth strategy. */
+  hashedPassword?: string;
+  /** User role determining permissions. */
+  role: "admin" | "candidate";
+  /** Links to the ID in the 'candidates' store if role is 'candidate'. */
+  candidateProfileId?: string;
+}
+
+/**
+ * Represents the link between a Candidate and a Job, signifying an application.
+ */
+export interface Application {
+  /** Unique identifier for the application instance. */
+  id: string; // Key path (consider generating UUIDs or using `${jobId}_${candidateId}`)
+  /** ID of the job being applied for. */
+  jobId: string; // Indexed
+  /** ID of the candidate profile applying. */
+  candidateId: string; // Indexed
+  /** Date the application was submitted (ISO string or Date). */
+  applicationDate: string;
+  /** Current status of the application within the hiring process. */
+  status:
+    | "applied"
+    | "screening"
+    | "interview"
+    | "offer"
+    | "hired"
+    | "rejected";
 }
