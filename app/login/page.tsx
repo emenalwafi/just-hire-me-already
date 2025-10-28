@@ -8,7 +8,7 @@ import { login, clearAuthError } from "@/store/authSlice";
 
 import EmailLinkForm from "@/components/auth/email-link-form/EmailLinkForm";
 import PasswordLoginForm from "@/components/auth/passowrd-login-form/PasswordLoginForm"; // <-- Import PasswordLoginForm
-// import ForgotPasswordForm from "@/components/auth/ForgotPasswordForm";
+import ForgotPasswordForm from "@/components/auth/forgot-password-form/ForgotPasswordForm";
 
 type AuthMode = "email-link" | "password" | "forgot-password";
 
@@ -23,6 +23,7 @@ const AuthenticationPage: React.FC = () => {
     error: authError,
     user,
   } = useSelector((state: RootState) => state.auth);
+  // one of the authError Message -> Email ini belum terdaftar sebagai akun di Rakamin Academy
   const isLoading = authStatus === "loading";
 
   const clearErrorCallback = useCallback(() => {
@@ -127,17 +128,13 @@ const AuthenticationPage: React.FC = () => {
       case "forgot-password":
         // Placeholder for ForgotPasswordForm
         return (
-          <div className="text-center p-8 bg-white rounded-lg shadow-md max-w-md w-full">
-            {/* TODO: Create and import ForgotPasswordForm */}
-            <h2 className="text-xl font-bold mb-4">Forgot Password</h2>
-            <p className="mb-4">Forgot Password Form Placeholder</p>
-            <button
-              onClick={switchToPassword}
-              className="text-primary-main hover:underline mt-4 block mx-auto"
-            >
-              Back to Login
-            </button>
-          </div>
+          <ForgotPasswordForm
+            onSubmit={handleForgotPasswordSubmit}
+            onBackToLogin={switchToPassword} // Use switchToPassword to go back
+            onClearError={clearErrorCallback}
+            errorMessage={authError}
+            isLoading={isLoading}
+          />
         );
       default:
         return null;

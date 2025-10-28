@@ -109,7 +109,7 @@ const EmailLinkForm: React.FC<EmailLinkFormProps> = ({
       <div className="w-full md:w-[500px] rounded-lg bg-neutral-10 p-6 shadow-[0px_1px_2px_0px_rgba(0,0,0,0.12)] sm:p-8 md:p-10 flex flex-col items-start gap-4 font-sans">
         {/* Header */}
         <div className="self-stretch flex flex-col items-start gap-2">
-          <h1 className="text-neutral-100 text-heading-s font-bold">
+          <h1 className="text-neutral-100 text-heading-sm font-bold">
             Masuk ke Rakamin
           </h1>
           <div className="self-stretch">

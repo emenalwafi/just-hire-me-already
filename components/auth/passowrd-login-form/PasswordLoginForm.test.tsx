@@ -402,7 +402,6 @@ describe("PasswordLoginForm", () => {
       );
       const submitButton = screen.getByRole("button", { name: "Masuk" });
       const emailInput = screen.getByTestId("mock-email-input");
-      const passwordInput = screen.getByTestId("mock-password-input");
 
       fireEvent.change(emailInput, { target: { value: "valid@example.com" } });
       fireEvent.click(submitButton);
