@@ -84,7 +84,7 @@ const TextInput: React.FC<TextInputProps> = ({
     caretColorClass = "caret-primary-main";
   } else {
     containerClasses +=
-      " bg-neutral-10 outline-neutral-40 hover:outline-neutral-70";
+      " bg-neutral-10 outline-neutral-40 hover:outline-primary-main";
     inputClasses += value ? " text-neutral-90" : " text-neutral-60";
   }
 

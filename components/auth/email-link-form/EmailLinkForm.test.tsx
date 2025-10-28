@@ -29,7 +29,7 @@ const mockInput = jest.fn();
  * Renders a simple HTML `<input>` element for interaction in tests.
  * Captures the `onChange` prop to allow simulation of input changes.
  */
-jest.mock("../../components/input/Input", () => ({
+jest.mock("../../../components/input/Input", () => ({
   __esModule: true,
   default: (props: {
     onChange: (value: InputValue) => void;
@@ -166,12 +166,12 @@ describe("EmailLinkForm", () => {
           onSubmit={mockOnSubmit}
           onSwitchToPassword={mockOnSwitchToPassword}
           onGoogleLogin={mockOnGoogleLogin}
-          errorMessage="Invalid credentials"
+          errorMessage="belum terdaftar"
         />
       );
       const alert = screen.getByRole("alert");
       expect(alert).toBeInTheDocument();
-      expect(alert).toHaveTextContent("Invalid credentials");
+      expect(alert).toHaveTextContent("belum terdaftar");
       expect(
         within(alert).getByRole("link", { name: /Daftar/i })
       ).toBeInTheDocument();

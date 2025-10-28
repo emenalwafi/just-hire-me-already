@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import React, { useState } from "react";
 import Image from "next/image";
@@ -133,12 +133,14 @@ const EmailLinkForm: React.FC<EmailLinkFormProps> = ({
           >
             <div className="text-center justify-center">
               <span className="text-danger-main text-sm">{errorMessage} </span>
-              <Link
-                href="/auth/register"
-                className="text-danger-main text-sm font-bold hover:underline focus:outline-none focus:ring-1 focus:ring-danger-focus rounded"
-              >
-                Daftar
-              </Link>
+              {errorMessage.includes("belum terdaftar") && (
+                <Link
+                  href="/auth/register"
+                  className="text-danger-main text-sm font-bold hover:underline focus:outline-none focus:ring-1 focus:ring-danger-focus rounded"
+                >
+                  Daftar
+                </Link>
+              )}
             </div>
           </div>
         )}

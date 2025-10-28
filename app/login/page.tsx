@@ -1,124 +1,154 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
-import { useRouter } from 'next/navigation';
-import { useSelector, useDispatch } from 'react-redux';
-import type { RootState, AppDispatch } from '@/store/store';
-import { login, clearAuthError } from '@/store/authSlice';
+import React, { useState, useCallback, useEffect } from "react"; // Added useEffect
+import { useRouter } from "next/navigation";
+import { useSelector, useDispatch } from "react-redux";
+import type { RootState, AppDispatch } from "@/store/store";
+import { login, clearAuthError } from "@/store/authSlice";
 
-import EmailLinkForm from "@/components/auth/EmailLinkForm";
-// import PasswordLoginForm from "@/components/auth/PasswordLoginForm";
+import EmailLinkForm from "@/components/auth/email-link-form/EmailLinkForm";
+import PasswordLoginForm from "@/components/auth/passowrd-login-form/PasswordLoginForm"; // <-- Import PasswordLoginForm
 // import ForgotPasswordForm from "@/components/auth/ForgotPasswordForm";
 
-type AuthMode = 'email-link' | 'password' | 'forgot-password';
+type AuthMode = "email-link" | "password" | "forgot-password";
 
 const AuthenticationPage: React.FC = () => {
-    const [authMode, setAuthMode] = useState<AuthMode>('email-link');
-    const dispatch: AppDispatch = useDispatch();
-    const router = useRouter();
+  // Default to 'password' mode now, or keep 'email-link' if preferred
+  const [authMode, setAuthMode] = useState<AuthMode>("email-link");
+  const dispatch: AppDispatch = useDispatch();
+  const router = useRouter();
 
-    const { status: authStatus, error: authError, user } = useSelector((state: RootState) => state.auth);
-    const isLoading = authStatus === 'loading';
+  const {
+    status: authStatus,
+    error: authError,
+    user,
+  } = useSelector((state: RootState) => state.auth);
+  const isLoading = authStatus === "loading";
 
-    // --- Handlers (Keep existing handlers - unchanged) ---
-    const handleEmailLinkSubmit = useCallback(async (email: string) => {
-        console.log("Submitting email link request for:", email);
-        
+  const clearErrorCallback = useCallback(() => {
+    dispatch(clearAuthError());
+  }, [dispatch]);
 
-        dispatch(clearAuthError());
-        alert("Email link functionality not yet implemented.");
-    }, [dispatch]);
+  // --- Handlers ---
+  const handleEmailLinkSubmit = useCallback(
+    async (email: string) => {
+      console.log("Submitting email link request for:", email);
+      clearErrorCallback(); // Clear error before submitting
+      // TODO: Implement email link sending logic (e.g., dispatch a new thunk)
+      alert("Email link functionality not yet implemented.");
+    },
+    [clearErrorCallback]
+  ); // Use the callback
 
-    const handlePasswordLoginSubmit = useCallback(async (credentials: { email: string; plainPassword: string }) => {
-        console.log("Submitting password login for:", credentials.email);
-        dispatch(clearAuthError());
-        try {
-            await dispatch(login(credentials)).unwrap();
-            console.log("Password login successful, redirecting...");
-            router.push('/');
-        } catch (rejectedValueOrSerializedError) {
-             console.error('Password login failed:', rejectedValueOrSerializedError);
-        }
-    }, [dispatch, router]);
+  const handlePasswordLoginSubmit = useCallback(
+    async (credentials: { email: string; plainPassword: string }) => {
+      console.log("Submitting password login for:", credentials.email);
+      clearErrorCallback(); // Clear previous errors before attempting login
+      try {
+        await dispatch(login(credentials)).unwrap();
+        console.log("Password login successful, redirecting...");
+        // Redirect is handled by useEffect
+      } catch (rejectedValueOrSerializedError) {
+        console.error("Password login failed:", rejectedValueOrSerializedError);
+      }
+    },
+    [dispatch, clearErrorCallback]
+  ); // Use the callback
 
-    const handleForgotPasswordSubmit = useCallback(async (email: string) => {
-        console.log("Submitting forgot password request for:", email);
-        dispatch(clearAuthError());
-        alert("Forgot password functionality not yet implemented.");
-    }, [dispatch]);
+  const handleForgotPasswordSubmit = useCallback(
+    async (email: string) => {
+      console.log("Submitting forgot password request for:", email);
+      clearErrorCallback(); // Clear error before submitting
+      // TODO: Implement forgot password logic
+      alert("Forgot password functionality not yet implemented.");
+    },
+    [clearErrorCallback]
+  ); // Use the callback
 
-    const handleGoogleLogin = useCallback(() => {
-        console.log("Initiating Google Login...");
-        dispatch(clearAuthError());
-        alert("Google Login functionality not yet implemented.");
-    }, [dispatch]);
+  const handleGoogleLogin = useCallback(() => {
+    console.log("Initiating Google Login...");
+    clearErrorCallback(); // Clear error before submitting
+    // TODO: Implement Google Sign-in logic
+    alert("Google Login functionality not yet implemented.");
+  }, [clearErrorCallback]); // Use the callback
 
-    // --- Switching Modes (Keep existing handlers - unchanged) ---
-    const switchToPassword = useCallback(() => {
-        dispatch(clearAuthError());
-        setAuthMode('password');
-    }, [dispatch]);
+  // --- Switching Modes ---
+  const switchToPassword = useCallback(() => {
+    clearErrorCallback(); // Use the callback
+    setAuthMode("password");
+  }, [clearErrorCallback]); // Use the callback
 
-    const switchToEmailLink = useCallback(() => {
-        dispatch(clearAuthError());
-        setAuthMode('email-link');
-    }, [dispatch]);
+  const switchToEmailLink = useCallback(() => {
+    clearErrorCallback(); // Use the callback
+    setAuthMode("email-link");
+  }, [clearErrorCallback]); // Use the callback
 
-     const switchToForgotPassword = useCallback(() => {
-        dispatch(clearAuthError());
-        setAuthMode('forgot-password');
-    }, [dispatch]);
+  const switchToForgotPassword = useCallback(() => {
+    clearErrorCallback(); // Use the callback
+    setAuthMode("forgot-password");
+  }, [clearErrorCallback]); // Use the callback
 
-    // --- Redirection Effect (Keep existing effect - unchanged) ---
-     React.useEffect(() => {
-        if (user) {
-            console.log("User already logged in, redirecting...");
-            router.push('/');
-        }
-    }, [user, router]);
+  // --- Redirection Effect (Unchanged) ---
+  useEffect(() => {
+    // Redirect if user is already logged in (e.g., after successful login)
+    if (user) {
+      console.log("User detected, redirecting...");
+      router.push("/");
+    }
+  }, [user, router]);
 
-    // --- Render Logic ---
-    const renderForm = () => {
-        switch (authMode) {
-            case 'email-link':
-                return (
-                    <EmailLinkForm
-                        onSubmit={handleEmailLinkSubmit}
-                        onSwitchToPassword={switchToPassword}
-                        onGoogleLogin={handleGoogleLogin}
-                        errorMessage={authError}
-                        isLoading={isLoading}
-                    />
-                );
-            case 'password':
-                 return (
-                     <div className="text-center p-8 bg-white rounded-lg shadow-md">
-                         Password Login Form Placeholder
-                         <button onClick={switchToEmailLink} className="text-primary-main hover:underline mt-4 block mx-auto">Switch to Email Link</button>
-                         <button onClick={switchToForgotPassword} className="text-primary-main hover:underline mt-2 block mx-auto">Forgot Password?</button>
-                    </div>
-                 );
-            case 'forgot-password':
-                 return (
-                      <div className="text-center p-8 bg-white rounded-lg shadow-md">
-                         Forgot Password Form Placeholder
-                         <button onClick={switchToPassword} className="text-primary-main hover:underline mt-4 block mx-auto">Back to Login</button>
-                      </div>
-                 );
-            default:
-                return null;
-        }
-    };
+  // --- Render Logic ---
+  const renderForm = () => {
+    switch (authMode) {
+      case "email-link":
+        return (
+          <EmailLinkForm
+            onSubmit={handleEmailLinkSubmit}
+            onSwitchToPassword={switchToPassword}
+            onGoogleLogin={handleGoogleLogin}
+            // Pass the error from Redux state
+            errorMessage={authError}
+            isLoading={isLoading}
+          />
+        );
+      case "password":
+        // Render the actual PasswordLoginForm
+        return (
+          <PasswordLoginForm
+            onSubmit={handlePasswordLoginSubmit}
+            onSwitchToEmailLink={switchToEmailLink}
+            onForgotPassword={switchToForgotPassword}
+            onGoogleLogin={handleGoogleLogin}
+            onClearError={clearErrorCallback}
+            errorMessage={authError}
+            isLoading={isLoading}
+          />
+        );
+      case "forgot-password":
+        // Placeholder for ForgotPasswordForm
+        return (
+          <div className="text-center p-8 bg-white rounded-lg shadow-md max-w-md w-full">
+            {/* TODO: Create and import ForgotPasswordForm */}
+            <h2 className="text-xl font-bold mb-4">Forgot Password</h2>
+            <p className="mb-4">Forgot Password Form Placeholder</p>
+            <button
+              onClick={switchToPassword}
+              className="text-primary-main hover:underline mt-4 block mx-auto"
+            >
+              Back to Login
+            </button>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
 
-    return (
-        // Use min-h-screen for full height, flex items-center justify-center for centering
-        // Add padding (p-4) which works well on mobile and desktop
-        <div className="flex min-h-screen items-center justify-center bg-neutral-20 p-4 font-sans">
-            {/* The form itself will now control its max-width */}
-            {renderForm()}
-        </div>
-    );
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-neutral-20 p-4 font-sans">
+      {renderForm()}
+    </div>
+  );
 };
 
 export default AuthenticationPage;
-
