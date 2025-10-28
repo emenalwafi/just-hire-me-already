@@ -70,6 +70,7 @@ const Input: React.FC<InputProps> = ({
       const handleTextChange: TextInputComponentOnChange = (event) => {
         onChange(event.target.value);
       };
+      const { successIcon, errorIcon } = config;
       return (
         <TextInput
           label={label}
@@ -82,6 +83,8 @@ const Input: React.FC<InputProps> = ({
           type={config.type}
           placeholder={config.placeholder}
           successMessage={config.successMessage}
+          successIcon={successIcon}
+          errorIcon={errorIcon}
           maxLength={config.maxLength}
         />
       );

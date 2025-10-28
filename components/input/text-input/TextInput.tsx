@@ -23,6 +23,10 @@ interface TextInputProps
   error?: boolean | string;
   /** Optional success message to display below the input. */
   successMessage?: string;
+  /** Optional custom icon node to display next to the success message. Defaults to a checkmark. */
+  successIcon?: React.ReactNode; // <-- Added successIcon prop
+  /** Optional custom icon node to display next to the error message. */
+  errorIcon?: React.ReactNode; // <-- Added errorIcon prop
   /** The functional type of the input, which determines behavior (e.g., password toggle). */
   type?: "text" | "email" | "url" | "password" | "number" | "search";
 }
@@ -46,6 +50,8 @@ const TextInput: React.FC<TextInputProps> = ({
   disabled = false,
   error = false,
   successMessage,
+  successIcon,
+  errorIcon,
   type = "text",
   className,
   ...rest
@@ -93,6 +99,10 @@ const TextInput: React.FC<TextInputProps> = ({
     }
   };
 
+  const defaultSuccessIcon = (
+    <UilCheckCircle size="16" className="text-primary-main flex-shrink-0" />
+  );
+
   return (
     <div
       className={`self-stretch inline-flex flex-col justify-start items-start gap-1 font-sans ${className} w-full `}
@@ -102,7 +112,7 @@ const TextInput: React.FC<TextInputProps> = ({
         <div className="self-stretch justify-start">
           <label htmlFor={rest.id || rest.name} className={labelClasses}>
             {label}
-            {required && <span className="text-danger-main text-sm">*</span>}
+            {required && <span id="asterisk" className="text-danger-main text-sm">*</span>}
           </label>
         </div>
       )}
@@ -131,7 +141,7 @@ const TextInput: React.FC<TextInputProps> = ({
             type="button"
             onClick={togglePasswordVisibility}
             disabled={disabled}
-            className={`focus:outline-none ${
+            className={`focus:outline-none p-1 -m-1 ${
               disabled ? "cursor-not-allowed" : "cursor-pointer"
             }`}
             aria-label={showPassword ? "Hide password" : "Show password"}
@@ -150,22 +160,33 @@ const TextInput: React.FC<TextInputProps> = ({
         <div
           id={`${rest.id || rest.name}-message`}
           className="self-stretch min-h-[1.25rem] inline-flex justify-start items-center gap-1"
+          role={hasErrorMessage ? "alert" : undefined}
+          aria-live={hasErrorMessage ? "assertive" : undefined}
         >
+          {/* Render Error Icon if provided */}
+          {hasErrorMessage && errorIcon && (
+            <span className="flex-shrink-0 w-4 h-4 text-danger-main">
+              {errorIcon}
+            </span>
+          )}
+          {/* Render Error Message */}
           {hasErrorMessage && (
             <div className="flex-1 justify-start text-danger-main text-sm">
               {error}
             </div>
           )}
+
+          {/* Render Success Icon (passed prop or default) */}
           {hasSuccessMessage && (
-            <>
-              <UilCheckCircle
-                size="16"
-                className="text-primary-main flex-shrink-0"
-              />
-              <div className="flex-1 justify-start text-primary-main text-sm">
-                {successMessage}
-              </div>
-            </>
+            <span className="flex-shrink-0 w-4 h-4 text-primary-main">
+              {successIcon || defaultSuccessIcon}
+            </span>
+          )}
+          {/* Render Success Message */}
+          {hasSuccessMessage && (
+            <div className="flex-1 justify-start text-primary-main text-sm">
+              {successMessage}
+            </div>
           )}
         </div>
       )}

@@ -168,8 +168,10 @@
 
     /* For Chrome, Safari, and Edge */
     &::-webkit-scrollbar {
-      width: 8px;  /* Width of the vertical scrollbar */
-      height: 8px; /* Height of the horizontal scrollbar */
+      width: 8px;
+      /* Width of the vertical scrollbar */
+      height: 8px;
+      /* Height of the horizontal scrollbar */
     }
 
     &::-webkit-scrollbar-track {
@@ -194,6 +196,9 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-nunito-sans);
+}
+
+* {
   caret-color: var(--color-primary-main);
+  font-family: var(--font-nunito-sans) !important;
 }

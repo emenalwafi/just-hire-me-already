@@ -34,6 +34,10 @@ export interface TextInputConfig extends BaseInputConfig {
   placeholder?: string;
   /** Optional success message displayed below the input when valid. */
   successMessage?: string;
+  /** Optional custom icon node to display next to the success message. Defaults to a checkmark. */
+  successIcon?: React.ReactNode;
+   /** Optional custom icon node to display next to the error message. */
+  errorIcon?: React.ReactNode;
   /** Maximum number of characters allowed in the input. */
   maxLength?: number;
 }
