@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from "react";
 import Link from "next/link";
 import { Job } from "@/types/dbTypes";
@@ -5,25 +7,39 @@ import {
   UilToggleOn,
   UilToggleOff,
   UilSpinnerAlt,
-} from "@iconscout/react-unicons"; // Added UilSpinnerAlt for loading
+} from "@iconscout/react-unicons";
 
+/**
+ * Props for the `JobCard` component.
+ */
 interface JobCardProps {
+  /** The job data object to display. */
   job: Job;
-  // Callback to notify parent about status toggle request
+  /**
+   * Asynchronous callback function invoked when the user clicks the status toggle button.
+   * Receives the job ID and the job's current status.
+   * The parent component is responsible for handling the actual status update and potential errors.
+   */
   onStatusToggle: (
     jobId: string,
     currentStatus: "active" | "closed" | "draft"
-  ) => Promise<void>; // Make it async
+  ) => Promise<void>;
 }
 
 /**
  * Displays a summary card for a job opening in the admin view.
- * Includes job title, salary, status badge, post date, and action buttons.
+ * Includes job title, salary, status badge, post date, and action buttons (manage, status toggle).
+ * Shows a loading indicator while the status toggle is in progress.
+ * @param {JobCardProps} props - The component props.
+ * @returns {React.ReactElement} The rendered job card component.
  */
 const JobCard: React.FC<JobCardProps> = ({ job, onStatusToggle }) => {
-  const [isToggling, setIsToggling] = useState(false); // State for loading indicator
+  const [isToggling, setIsToggling] = useState(false);
 
-  // Determine badge style based on job status
+  /**
+   * Determines the appropriate JSX for the status badge based on the job's status.
+   * @returns {React.ReactElement} The styled badge element.
+   */
   const getStatusBadge = () => {
     switch (job.status) {
       case "active":
@@ -44,11 +60,11 @@ const JobCard: React.FC<JobCardProps> = ({ job, onStatusToggle }) => {
             <div className="font-bold text-secondary-main">Draft</div>
           </div>
         );
-      case "closed": // Treat 'closed' as 'inactive' for display
+      case "closed":
       default:
         return (
           <div
-            data-type="Inactive" // Changed data-type for clarity
+            data-type="Inactive"
             className="flex items-center gap-2 rounded-lg bg-danger-surface px-3 py-1 text-sm outline outline-1 outline-offset-[-1px] outline-danger-border md:px-4 md:py-1 md:text-base"
           >
             <div className="font-bold text-danger-main">Inactive</div>
@@ -57,17 +73,18 @@ const JobCard: React.FC<JobCardProps> = ({ job, onStatusToggle }) => {
     }
   };
 
+  /**
+   * Handles the click event for the status toggle button.
+   * Sets the loading state and calls the `onStatusToggle` prop.
+   * Manages the loading state internally.
+   */
   const handleToggleClick = async () => {
-    // Prevent toggling drafts or if already toggling
     if (job.status === "draft" || isToggling) return;
     setIsToggling(true);
     try {
-      // Call the async function passed from the parent
-      await onStatusToggle(job.id, job.status);
+      await onStatusToggle(job.id, job.status as "active" | "closed"); // Cast status here
     } catch (error) {
-      console.error("Error toggling status in JobCard:", error);
-      // Error handling (e.g., showing a notification) could be done here
-      // or rely on the parent component's error handling which reverts the state.
+      // Parent component handles reverting state on error
     } finally {
       setIsToggling(false);
     }
@@ -77,7 +94,6 @@ const JobCard: React.FC<JobCardProps> = ({ job, onStatusToggle }) => {
 
   return (
     <div className="self-stretch rounded-2xl bg-neutral-10 p-4 shadow-[0px_4px_8px_0px_rgba(0,0,0,0.10)] md:p-6">
-      {/* Top Row: Badges & Toggle */}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 md:gap-4">
         <div className="flex flex-wrap items-center gap-2 md:gap-4">
           {getStatusBadge()}
@@ -86,13 +102,10 @@ const JobCard: React.FC<JobCardProps> = ({ job, onStatusToggle }) => {
             className="rounded px-3 py-1 text-sm outline outline-1 outline-offset-[-1px] outline-neutral-200 md:px-4 md:py-1 md:text-base"
           >
             <div className="text-neutral-700">
-              {" "}
-              {/* Adjusted text color */}
               {job.list_card?.started_on_text || "Date N/A"}
             </div>
           </div>
         </div>
-        {/* Status Toggle - Don't show for drafts */}
         {job.status !== "draft" && (
           <button
             onClick={handleToggleClick}
@@ -119,9 +132,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, onStatusToggle }) => {
         )}
       </div>
 
-      {/* Bottom Row: Info & Manage Button */}
       <div className="flex flex-col items-start justify-between gap-3 md:flex-row md:items-end">
-        {/* Job Title & Salary */}
         <div className="w-full md:w-auto">
           <div
             className="mb-1 truncate text-lg font-bold text-neutral-100 md:mb-2 md:text-xl"
@@ -134,7 +145,6 @@ const JobCard: React.FC<JobCardProps> = ({ job, onStatusToggle }) => {
           </div>
         </div>
 
-        {/* Manage Button */}
         <div className="flex-shrink-0">
           <Link
             href={`/admin/jobs/${job.id}/candidates`}

@@ -2,43 +2,66 @@
 
 import { ColumnDef, createColumnHelper } from "@tanstack/react-table";
 import { CheckboxInput } from "@/components/input/checkbox-input/CheckboxInput";
-import { Application } from "@/types/dbTypes"; // Import base types if needed
+import { Application } from "@/types/dbTypes";
 
-// --- Combined Data Type ---
-// This defines the structure of the data object passed to the DataTable
+/**
+ * Defines the combined data structure used for each row in the Candidate List DataTable.
+ * This aggregates data from `Application` and `Candidate` (including extracted attributes).
+ */
 export type CombinedData = {
-  id: string; // Application ID (unique key for the row)
+  /** The unique identifier for the row, typically the Application ID. */
+  id: string;
+  /** The ID of the candidate associated with this application. */
   candidateId: string;
+  /** The ID of the job associated with this application. */
   jobId: string;
+  /** The full name of the candidate. */
   name: string;
+  /** The email address of the candidate. */
   email: string;
+  /** The phone number of the candidate. */
   phone: string;
-  status: Application["status"]; // Use the specific status type
-  applicationDate: string; // ISO String
-  // Add other fields from Candidate Attributes or calculated values
-  matchRate?: number | null; // Optional example
+  /** The current status of the job application (e.g., 'applied', 'screening'). */
+  status: Application["status"];
+  /** The date the application was submitted (ISO string format). */
+  applicationDate: string;
+  /** Optional match rate score (example calculated field). */
+  matchRate?: number | null;
+  /** The calculated age of the candidate, or null if not available. */
   usia?: number | null;
+  /** The candidate's last reported work experience, or null. */
   lastExperience?: string | null;
+  /** The candidate's reported religion, or null. */
   agama?: string | null;
+  /** The candidate's reported domicile, or null. */
   domisili?: string | null;
+  /** The candidate's reported gender, or null. */
   jenisKelamin?: string | null;
-  salary?: string | null; // Example expected salary
+  /** The candidate's expected salary, or null. */
+  salary?: string | null;
 };
 
-// --- Column Helper ---
+/**
+ * Instance of `@tanstack/react-table`'s `createColumnHelper` typed for the `CombinedData` structure.
+ * Used for defining table columns with type safety.
+ */
 const columnHelper = createColumnHelper<CombinedData>();
 
-// --- Helper Function for Status Badge Styling ---
+/**
+ * Helper function to determine the appropriate Tailwind CSS classes for rendering a status badge.
+ * @param {Application["status"]} status - The application status string.
+ * @returns {string} A string containing Tailwind CSS classes for the badge.
+ */
 const getStatusBadgeClasses = (status: Application["status"]): string => {
   switch (status) {
     case "applied":
       return "bg-primary-surface text-primary-main border-primary-border";
     case "screening":
-      return "bg-blue-100 text-blue-700 border-blue-300"; // Example style
+      return "bg-blue-100 text-blue-700 border-blue-300";
     case "interview":
-      return "bg-purple-100 text-purple-700 border-purple-300"; // Example style
+      return "bg-purple-100 text-purple-700 border-purple-300";
     case "offer":
-      return "bg-yellow-100 text-yellow-700 border-yellow-300"; // Example style
+      return "bg-yellow-100 text-yellow-700 border-yellow-300";
     case "hired":
       return "bg-success-surface text-success-main border-success-border";
     case "rejected":
@@ -48,19 +71,20 @@ const getStatusBadgeClasses = (status: Application["status"]): string => {
   }
 };
 
-// --- Column Definitions ---
+/**
+ * An array of `ColumnDef` objects defining the columns for the Candidate List DataTable.
+ * Includes definitions for selection, candidate name, status, application date, and other attributes.
+ * @type {ColumnDef<CombinedData, any>[]}
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const columns: ColumnDef<CombinedData, any>[] = [
-  // Select Column (Pinned)
   columnHelper.display({
     id: "select",
-    size: 64, // w-16
+    size: 64,
     header: ({ table }) => (
       <div className="flex items-center justify-center">
-        {" "}
-        {/* Center checkbox */}
         <CheckboxInput
-          index="header-all" // Use a unique index
+          index="header-all"
           checked={table.getIsAllRowsSelected()}
           indeterminate={table.getIsSomeRowsSelected()}
           onChange={table.getToggleAllRowsSelectedHandler()}
@@ -69,10 +93,8 @@ export const columns: ColumnDef<CombinedData, any>[] = [
     ),
     cell: ({ row }) => (
       <div className="flex items-center justify-center">
-        {" "}
-        {/* Center checkbox */}
         <CheckboxInput
-          index={row.original.id} // Use a unique ID like application ID
+          index={row.original.id}
           checked={row.getIsSelected()}
           disabled={!row.getCanSelect()}
           indeterminate={row.getIsSomeSelected()}
@@ -84,10 +106,9 @@ export const columns: ColumnDef<CombinedData, any>[] = [
     enableHiding: false,
   }),
 
-  // Candidate Name (Pinned)
   columnHelper.accessor("name", {
     header: "NAMA LENGKAP",
-    size: 208, // w-52
+    size: 208,
     cell: (info) => (
       <div className="text-base font-medium text-neutral-90 truncate">
         {info.getValue()}
@@ -95,10 +116,9 @@ export const columns: ColumnDef<CombinedData, any>[] = [
     ),
   }),
 
-  // Application Status
   columnHelper.accessor("status", {
     header: "TAHAPAN",
-    size: 144, // w-36
+    size: 144,
     cell: (info) => {
       const status = info.getValue();
       const badgeClasses = getStatusBadgeClasses(status);
@@ -107,8 +127,6 @@ export const columns: ColumnDef<CombinedData, any>[] = [
           className={`inline-flex justify-center items-center px-2 py-0.5 rounded outline outline-1 outline-offset-[-1px] ${badgeClasses}`}
         >
           <div className="text-sm font-bold capitalize line-clamp-1">
-            {" "}
-            {/* Capitalize */}
             {status}
           </div>
         </div>
@@ -116,14 +134,12 @@ export const columns: ColumnDef<CombinedData, any>[] = [
     },
   }),
 
-  // Application Date
   columnHelper.accessor("applicationDate", {
     header: "APPLICATION DATE",
-    size: 160, // w-40
+    size: 160,
     cell: (info) => {
       const dateValue = info.getValue();
       try {
-        // Format date nicely, e.g., "Oct 29, 2025"
         const formattedDate = new Date(dateValue).toLocaleDateString("en-US", {
           year: "numeric",
           month: "short",
@@ -133,15 +149,14 @@ export const columns: ColumnDef<CombinedData, any>[] = [
           <div className="text-base text-neutral-700">{formattedDate}</div>
         );
       } catch (e) {
-        return <div className="text-base text-neutral-700">{dateValue}</div>; // Fallback
+        return <div className="text-base text-neutral-700">{dateValue}</div>;
       }
     },
   }),
 
-  // Email Column
   columnHelper.accessor("email", {
     header: "ALAMAT EMAIL",
-    size: 200, // w-50 Increased size
+    size: 200,
     cell: (info) => (
       <div className="text-base text-neutral-700 truncate">
         {info.getValue()}
@@ -149,10 +164,9 @@ export const columns: ColumnDef<CombinedData, any>[] = [
     ),
   }),
 
-  // Telepon Column
   columnHelper.accessor("phone", {
     header: "NOMOR HP",
-    size: 160, // w-40
+    size: 160,
     cell: (info) => (
       <div className="text-base text-neutral-700 truncate">
         {info.getValue()}
@@ -160,10 +174,9 @@ export const columns: ColumnDef<CombinedData, any>[] = [
     ),
   }),
 
-  // Usia Column (Calculated in page.tsx)
   columnHelper.accessor("usia", {
     header: "USIA",
-    size: 96, // w-24
+    size: 96,
     cell: (info) => (
       <div className="text-base text-neutral-700">
         {info.getValue() ?? "N/A"}
@@ -171,10 +184,9 @@ export const columns: ColumnDef<CombinedData, any>[] = [
     ),
   }),
 
-  // Last Experience Column
   columnHelper.accessor("lastExperience", {
     header: "LAST EXPERIENCE",
-    size: 200, // w-50 Increased size
+    size: 200,
     cell: (info) => (
       <div className="text-base text-neutral-700 truncate">
         {info.getValue() ?? "N/A"}
@@ -182,12 +194,9 @@ export const columns: ColumnDef<CombinedData, any>[] = [
     ),
   }),
 
-  // --- Add other columns as needed based on CombinedData ---
-
-  // Example: Domicile
   columnHelper.accessor("domisili", {
     header: "DOMISILI",
-    size: 160, // w-40
+    size: 160,
     cell: (info) => (
       <div className="text-base text-neutral-700 truncate">
         {info.getValue() ?? "N/A"}
@@ -195,10 +204,9 @@ export const columns: ColumnDef<CombinedData, any>[] = [
     ),
   }),
 
-  // Example: Gender
   columnHelper.accessor("jenisKelamin", {
     header: "JENIS KELAMIN",
-    size: 140, // w-35
+    size: 140,
     cell: (info) => (
       <div className="text-base text-neutral-700 truncate">
         {info.getValue() ?? "N/A"}

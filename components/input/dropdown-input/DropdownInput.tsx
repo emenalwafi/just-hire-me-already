@@ -218,7 +218,7 @@ const DropdownInput: React.FC<DropdownInputProps> = ({
           />
         </button>
 
-        {name && <input type="hidden" name={name} value={value?.id || ""} />}
+        {name && <input type="hidden" name={name} value={value?.value || ""} />}
       </div>
 
       {/* Error Message */}

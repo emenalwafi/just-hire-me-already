@@ -2,39 +2,55 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { UilTimes } from "@iconscout/react-unicons";
-import { addJob, getJobPostingConfiguration } from "@/services/dbServices"; // <<< Import addJob
+import { addJob, getJobPostingConfiguration } from "@/services/dbServices";
 import {
   JobPostingConfiguration,
   JobSpecificApplicationConfiguration,
   Job,
   SalaryRange,
   JobPostingFieldConfig,
-} from "@/types/dbTypes"; // <<< Import Job type
-import { v4 as uuidv4 } from "uuid"; // <<< Import uuid
+} from "@/types/dbTypes";
+import { v4 as uuidv4 } from "uuid";
 import Input from "@/components/input/Input";
 import ApplicationConfigEditor from "@/components/input/application-config-editor/ApplicationConfigEditor";
 import { InputConfig } from "@/types/InputConfig";
 
+/**
+ * Props for the `JobCreationDialog` component.
+ */
 interface JobCreationDialogProps {
+  /** Whether the dialog is currently open and visible. */
   isOpen: boolean;
+  /** Callback function invoked when the dialog should be closed (e.g., overlay click, close button). */
   onClose: () => void;
-  onJobCreated: () => void; // Callback after successful creation
+  /** Callback function invoked after a job has been successfully created and saved. */
+  onJobCreated: () => void;
 }
 
-// Helper function to format number as Rupiah string
+/**
+ * Helper function to format a number or string into an Indonesian Rupiah (IDR) format.
+ * Removes non-digit characters and uses Indonesian locale for formatting.
+ * @param {number | string | null | undefined} value - The value to format.
+ * @returns {string} The formatted Rupiah string (e.g., "1.000.000") or an empty string if invalid.
+ */
 const formatRupiah = (value: number | string | null | undefined): string => {
   if (value === null || value === undefined || value === "") return "";
-  const numStr = String(value).replace(/[^0-9]/g, ""); // Remove non-digits
+  const numStr = String(value).replace(/[^0-9]/g, "");
   if (numStr === "") return "";
   try {
     const number = parseInt(numStr, 10);
-    return number.toLocaleString("id-ID"); // Format with Indonesian locale (uses '.')
+    return number.toLocaleString("id-ID");
   } catch {
-    return ""; // Return empty if parsing fails
+    return "";
   }
 };
 
-// Helper function to parse Rupiah string back to number
+/**
+ * Helper function to parse an Indonesian Rupiah (IDR) formatted string back into a number.
+ * Removes non-digit characters before parsing.
+ * @param {string | null | undefined} value - The formatted Rupiah string to parse.
+ * @returns {number | null} The parsed number, or null if the input is invalid or empty.
+ */
 const parseRupiah = (value: string | null | undefined): number | null => {
   if (!value) return null;
   const numStr = String(value).replace(/[^0-9]/g, "");
@@ -46,6 +62,13 @@ const parseRupiah = (value: string | null | undefined): number | null => {
   }
 };
 
+/**
+ * A modal dialog component for creating new job postings.
+ * Fetches the job posting configuration, renders a dynamic form based on it,
+ * handles validation, and submits the new job data.
+ * @param {JobCreationDialogProps} props - The component props.
+ * @returns {React.ReactElement | null} The rendered dialog or null if `isOpen` is false.
+ */
 const JobCreationDialog: React.FC<JobCreationDialogProps> = ({
   isOpen,
   onClose,
@@ -57,22 +80,22 @@ const JobCreationDialog: React.FC<JobCreationDialogProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // State to track validation errors for each field
   const [validationErrors, setValidationErrors] = useState<
     Record<string, string>
   >({});
 
-  // Fetch configuration when dialog opens
+  /**
+   * Effect hook to fetch the job posting configuration when the dialog opens.
+   * Also resets the form state when the dialog closes.
+   */
   useEffect(() => {
     if (isOpen && !postingConfig) {
       setIsLoading(true);
       setError(null);
-      setValidationErrors({}); // Clear validation errors on open
+      setValidationErrors({});
       getJobPostingConfiguration()
         .then((config) => {
           if (config) {
-            console.log(config, 'hey check this out');
-            
             setPostingConfig(config);
             const initialData: Record<string, any> = {};
             config.fields.forEach((field) => {
@@ -84,25 +107,21 @@ const JobCreationDialog: React.FC<JobCreationDialogProps> = ({
                   JSON.stringify(field.defaultValue)
                 );
               } else {
-                initialData[field.key] = null; // Default other fields to null
+                initialData[field.key] = null;
               }
             });
             setFormData(initialData);
           } else {
             setError("Could not load job posting configuration.");
-            console.error("Job Posting Configuration not found in DB.");
           }
         })
         .catch((err) => {
-          console.error("Error fetching job posting configuration:", err);
           setError("Failed to load configuration.");
         })
         .finally(() => {
           setIsLoading(false);
         });
     } else if (!isOpen) {
-      // Reset state when closing fully
-      // Moved this inside if(!isOpen) block
       setPostingConfig(null);
       setFormData({});
       setError(null);
@@ -110,12 +129,17 @@ const JobCreationDialog: React.FC<JobCreationDialogProps> = ({
       setIsLoading(false);
       setIsSubmitting(false);
     }
-  }, [isOpen]); // <<<< Removed postingConfig dependency to prevent re-fetching/resetting formData
+  }, [isOpen]);
 
-  // Handler for form input changes, including salary formatting
+  /**
+   * Memoized callback to handle changes in form inputs.
+   * Clears validation errors for the specific field being changed.
+   * Formats salary fields using `formatRupiah`.
+   * @param {string} key - The key (name) of the input field being changed.
+   * @param {any} value - The new value from the input component.
+   */
   const handleFormChange = useCallback(
     (key: string, value: any) => {
-      // Clear validation error for this field on change
       if (validationErrors[key]) {
         setValidationErrors((prev) => {
           const newErrors = { ...prev };
@@ -125,11 +149,10 @@ const JobCreationDialog: React.FC<JobCreationDialogProps> = ({
       }
 
       if (key === "salaryMin" || key === "salaryMax") {
-        // Format Rupiah, store formatted string
         const formattedValue = formatRupiah(value);
         setFormData((prev) => ({
           ...prev,
-          [key]: formattedValue || null, // Store null if empty/invalid
+          [key]: formattedValue || null,
         }));
       } else {
         setFormData((prev) => ({
@@ -139,9 +162,14 @@ const JobCreationDialog: React.FC<JobCreationDialogProps> = ({
       }
     },
     [validationErrors]
-  ); // Added validationErrors dependency
+  );
 
-  // Validate form data based on configuration
+  /**
+   * Memoized callback to validate the entire form based on the `postingConfig`.
+   * Checks for required fields and specific formats (like salary).
+   * Sets the `validationErrors` state.
+   * @returns {boolean} `true` if the form is valid, `false` otherwise.
+   */
   const validateForm = useCallback(() => {
     if (!postingConfig) return false;
     const errors: Record<string, string> = {};
@@ -153,16 +181,14 @@ const JobCreationDialog: React.FC<JobCreationDialogProps> = ({
         let isEmpty =
           value === null || value === undefined || String(value).trim() === "";
 
-        // Special check for dropdowns/objects that might be stored as {id: ..., label: ...}
         if (
           field.type === "select" &&
           typeof value === "object" &&
           value !== null &&
           !value.value
         ) {
-          isEmpty = true; // Treat empty dropdown object as empty
+          isEmpty = true;
         }
-        // Special check for application config (ensure it's not empty/default - could add more checks)
         if (
           field.type === "applicationConfigEditor" &&
           (!value || !value.sections || value.sections.length === 0)
@@ -175,7 +201,6 @@ const JobCreationDialog: React.FC<JobCreationDialogProps> = ({
           isValid = false;
         }
       }
-      // Add more specific validation if needed (e.g., number ranges, email format)
       if (field.key === "salaryMin" || field.key === "salaryMax") {
         const numVal = parseRupiah(formData[field.key]);
         if (formData[field.key] && (numVal === null || numVal < 0)) {
@@ -183,12 +208,10 @@ const JobCreationDialog: React.FC<JobCreationDialogProps> = ({
           isValid = false;
         }
       }
-      // Check if max salary is less than min salary
       const minSalary = parseRupiah(formData["salaryMin"]);
       const maxSalary = parseRupiah(formData["salaryMax"]);
       if (minSalary !== null && maxSalary !== null && maxSalary < minSalary) {
         if (!errors["salaryMax"]) {
-          // Avoid duplicate error messages
           errors["salaryMax"] =
             "Maximum salary cannot be less than minimum salary.";
         }
@@ -200,18 +223,22 @@ const JobCreationDialog: React.FC<JobCreationDialogProps> = ({
     return isValid;
   }, [postingConfig, formData]);
 
-  // Handler for the publish action
+  /**
+   * Memoized callback to handle the "Publish Job" action.
+   * Validates the form, constructs the `Job` object, saves it using `addJob`,
+   * calls `onJobCreated`, and closes the dialog on success.
+   * Sets error state on failure.
+   */
   const handlePublish = useCallback(async () => {
     setError(null);
-    setValidationErrors({}); // Clear previous validation errors
+    setValidationErrors({});
     if (!postingConfig || !validateForm()) {
       setError("Please fill in all required fields correctly.");
-      return; // Stop if validation fails or config not loaded
+      return;
     }
 
     setIsSubmitting(true);
 
-    // Construct Job object
     const title = formData.title || "Untitled Job";
     const slug = title
       .toLowerCase()
@@ -222,19 +249,18 @@ const JobCreationDialog: React.FC<JobCreationDialogProps> = ({
 
     const newJob: Job = {
       id: uuidv4(),
-      slug: `${slug}-${Date.now()}`, // Add timestamp for uniqueness
+      slug: `${slug}-${Date.now()}`,
       title: title,
-      jobType: formData.jobType?.value || formData.jobType || "Not Specified", // Handle dropdown object or plain value
+      jobType: formData.jobType?.value || formData.jobType || "Not Specified",
       description: formData.description || "",
       candidatesNeeded: formData.candidatesNeeded
         ? parseInt(formData.candidatesNeeded, 10) || undefined
         : undefined,
-      status: formData.status?.value || formData.status || "draft", // Handle dropdown or plain value
+      status: formData.status?.value || formData.status || "draft",
       salary_range: {
         min: minSalaryNum ?? 0,
         max: maxSalaryNum ?? 0,
         currency: "IDR",
-        // Generate display text dynamically
         display_text:
           minSalaryNum === null && maxSalaryNum === null
             ? "Not specified"
@@ -242,10 +268,8 @@ const JobCreationDialog: React.FC<JobCreationDialogProps> = ({
                 maxSalaryNum?.toLocaleString("id-ID") ?? "?"
               }`,
       },
-      // Use the application config from formData
       applicationConfiguration:
         formData.applicationConfig as JobSpecificApplicationConfiguration,
-      // Create default list_card info
       list_card: {
         badge: formData.status?.value || formData.status || "Draft",
         started_on_text: `Created ${new Date().toLocaleDateString("en-GB", {
@@ -257,67 +281,67 @@ const JobCreationDialog: React.FC<JobCreationDialogProps> = ({
       },
     };
 
-    console.log("Publishing Job:", newJob);
-
     try {
       await addJob(newJob);
-      console.log("Job created successfully.");
-      onJobCreated(); // Call callback to refresh list
-      onClose(); // Close dialog
+      onJobCreated();
+      onClose();
     } catch (publishError: any) {
-      console.error("Error creating job:", publishError);
       setError(publishError.message || "Failed to create job.");
     } finally {
       setIsSubmitting(false);
     }
-  }, [formData, postingConfig, onClose, onJobCreated, validateForm]); // Added validateForm
+  }, [formData, postingConfig, onClose, onJobCreated, validateForm]);
 
-  // Handle click on overlay to close
+  /**
+   * Handles clicks on the dialog overlay to close the dialog,
+   * unless the form is currently submitting.
+   * @param {React.MouseEvent<HTMLDivElement>} e - The mouse event.
+   */
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget && !isSubmitting) {
       onClose();
     }
   };
 
-  // --- Render Logic ---
   if (!isOpen) {
     return null;
   }
 
-  // Define the Rupiah prefix component
   const rupiahPrefix = (
     <span className="font-bold text-neutral-90 mr-1">Rp</span>
   );
 
-  // Function to get config with error message and potentially prefix
+  /**
+   * Generates the appropriate `InputConfig` for a given field definition,
+   * including merging validation errors and adding prefixes for salary fields.
+   * @param {JobPostingFieldConfig} field - The field configuration from the posting config.
+   * @returns {InputConfig} The configuration object ready to be passed to the `Input` component.
+   */
   const getConfigForInput = (field: JobPostingFieldConfig): InputConfig => {
     const configWithError = {
       ...field,
-      error: validationErrors[field.key] || field.error, // Combine static and dynamic errors
+      error: validationErrors[field.key] || field.error,
     };
-    // Add prefix for salary fields
     if (field.key === "salaryMin" || field.key === "salaryMax") {
       return {
         ...configWithError,
-        type: "text", // Use text type for formatting
-        inputMode: "numeric", // Hint for mobile keyboards
+        type: "text",
+        inputMode: "numeric",
         prefixCustom: rupiahPrefix,
-      } as InputConfig; // Cast necessary because TS doesn't narrow well here
+      } as InputConfig;
     }
-    // Ensure correct type for candidateNeeded
     if (field.key === "candidatesNeeded") {
       return {
         ...configWithError,
-        type: "number", // Ensure it's number type
+        type: "number",
       } as InputConfig;
     }
 
-    // For select types, ensure options are passed correctly
     if (field.type === "select" && field.options) {
       return { ...configWithError, options: field.options } as InputConfig;
     }
 
-    return configWithError as InputConfig; // Cast to base InputConfig
+    return configWithError as InputConfig;
   };
 
   return (
@@ -326,13 +350,12 @@ const JobCreationDialog: React.FC<JobCreationDialogProps> = ({
       onClick={handleOverlayClick}
     >
       <div
-        className="relative flex w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-neutral-10 shadow-xl scale-in max-h-[90vh]" // Increased max-w-4xl
+        className="relative flex w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-neutral-10 shadow-xl scale-in max-h-[90vh]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="dialog-title"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex flex-shrink-0 items-center justify-between border-b border-neutral-30 p-4 md:p-6">
           <h2
             id="dialog-title"
@@ -350,7 +373,6 @@ const JobCreationDialog: React.FC<JobCreationDialogProps> = ({
           </button>
         </div>
 
-        {/* Body (Scrollable) */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar">
           {isLoading && (
             <p className="text-center text-neutral-60">
@@ -361,7 +383,6 @@ const JobCreationDialog: React.FC<JobCreationDialogProps> = ({
             <p className="text-center text-danger-main">{error}</p>
           )}
           {postingConfig ? (
-            // Added space-y-6 for vertical spacing between elements
             <form
               id="job-creation-form"
               onSubmit={(e) => {
@@ -370,13 +391,10 @@ const JobCreationDialog: React.FC<JobCreationDialogProps> = ({
               }}
               className="space-y-6"
             >
-              {/* --- Render Standard Fields --- */}
               {postingConfig.fields
-                .filter((field) => field.type !== "applicationConfigEditor") // Exclude the special editor type
+                .filter((field) => field.type !== "applicationConfigEditor")
                 .map((field) => {
-                  // Specific layout for salary fields
                   if (field.key === "salaryMin" || field.key === "salaryMax") {
-                    // Render salary fields only once, within their container
                     if (field.key === "salaryMin") {
                       const maxField = postingConfig.fields.find(
                         (f) => f.key === "salaryMax"
@@ -386,15 +404,11 @@ const JobCreationDialog: React.FC<JobCreationDialogProps> = ({
                           key="salary-section"
                           className="self-stretch flex flex-col justify-start items-start gap-4 pt-6"
                         >
-                          {" "}
-                          {/* Added pt-6 */}
                           <div className="self-stretch h-0 outline outline-1 outline-offset-[-0.50px] outline-neutral-40" />
                           <div className="w-full justify-start text-neutral-90 text-sm font-semibold mb-2">
                             Job Salary
-                          </div>{" "}
-                          {/* Adjusted styling */}
+                          </div>
                           <div className="self-stretch flex flex-col sm:flex-row justify-start items-start gap-4">
-                            {/* Min Salary */}
                             <div className="flex-1 w-full sm:w-auto">
                               <Input
                                 config={getConfigForInput(field)}
@@ -404,15 +418,10 @@ const JobCreationDialog: React.FC<JobCreationDialogProps> = ({
                                 }
                               />
                             </div>
-                            {/* Separator */}
                             <div className="hidden sm:flex items-center pt-10">
-                              {" "}
-                              {/* Adjusted top padding */}
                               <div className="w-4 h-0 outline outline-1 outline-offset-[-0.50px] outline-neutral-40"></div>
                             </div>
-                            <div className="block sm:hidden w-full h-4"></div>{" "}
-                            {/* Spacer for mobile */}
-                            {/* Max Salary */}
+                            <div className="block sm:hidden w-full h-4"></div>
                             {maxField && (
                               <div className="flex-1 w-full sm:w-auto">
                                 <Input
@@ -428,21 +437,19 @@ const JobCreationDialog: React.FC<JobCreationDialogProps> = ({
                         </div>
                       );
                     }
-                    return null; // Don't render salaryMax individually
+                    return null;
                   } else {
-                    // Render other fields directly
                     return (
-                        <Input
-                          key={field.key}
-                          config={getConfigForInput(field)}
-                          value={formData[field.key]}
-                          onChange={(value) => handleFormChange(field.key, value)}
-                        />
+                      <Input
+                        key={field.key}
+                        config={getConfigForInput(field)}
+                        value={formData[field.key]}
+                        onChange={(value) => handleFormChange(field.key, value)}
+                      />
                     );
                   }
                 })}
 
-              {/* --- Render Application Config Editor --- */}
               {postingConfig.fields
                 .filter((field) => field.type === "applicationConfigEditor")
                 .map((field) => (
@@ -454,13 +461,11 @@ const JobCreationDialog: React.FC<JobCreationDialogProps> = ({
                 ))}
             </form>
           ) : null}
-          {/* Display submission error */}
           {!isSubmitting && error && postingConfig && (
             <p className="mt-4 text-center text-sm text-danger-main">{error}</p>
           )}
         </div>
 
-        {/* Footer */}
         <div className="flex flex-shrink-0 items-center justify-end gap-3 border-t border-neutral-30 p-4 md:p-6">
           <button
             type="button"
@@ -478,8 +483,8 @@ const JobCreationDialog: React.FC<JobCreationDialogProps> = ({
               isSubmitting ||
               !postingConfig ||
               Object.keys(validationErrors).length > 0
-            } // <<< Also disable if validation errors exist
-            className="cursor-pointer rounded-lg bg-primary-main px-4 py-1.5 text-sm font-bold text-neutral-10 shadow-[0px_1px_2px_0px_rgba(0,0,0,0.12)] hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary-focus focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed" // Changed to primary button
+            }
+            className="cursor-pointer rounded-lg bg-primary-main px-4 py-1.5 text-sm font-bold text-neutral-10 shadow-[0px_1px_2px_0px_rgba(0,0,0,0.12)] hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary-focus focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? "Publishing..." : "Publish Job"}
           </button>

@@ -4,15 +4,20 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { UilSearch, UilPlus } from "@iconscout/react-unicons"; // Added UilPlus for potential FAB
+import { UilSearch, UilPlus, UilSignout } from "@iconscout/react-unicons";
 import type { RootState, AppDispatch } from "@/store/store";
 import { logout } from "@/store/authSlice";
-import { getAllJobs, addJob, getJobById } from "@/services/dbServices"; // Assuming addJob exists for status toggle later
+import { getAllJobs, addJob, getJobById } from "@/services/dbServices";
 import type { Job } from "@/types/dbTypes";
-import JobCard from "@/components/admin/job-card/JobCard"; // <<< Import JobCard
+import JobCard from "@/components/admin/job-card/JobCard";
 import JobCreationDialog from "@/components/admin/job-creation-dialog/JobCreationDialog";
-// import JobCreationDrawer from "@/components/admin/JobCreationDrawer"; // Keep commented for now
 
+/**
+ * Admin home page component displaying a list of job postings,
+ * allowing searching, status toggling, and creation of new jobs.
+ * Includes an authentication guard to redirect non-admin users.
+ * @returns {React.ReactElement | null} The rendered admin home page or null if redirecting.
+ */
 const AdminHomePage: React.FC = () => {
   const dispatch: AppDispatch = useDispatch();
   const router = useRouter();
@@ -23,18 +28,22 @@ const AdminHomePage: React.FC = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState<string>("");
 
-  // --- Authentication Guard ---
+  /**
+   * Effect hook for authentication guard. Redirects non-admin users to the login page.
+   */
   useEffect(() => {
     if (!user || user.role !== "admin") {
       router.replace("/login");
     }
   }, [user, router]);
 
-  // --- Data Fetching ---
+  /**
+   * Memoized callback function to fetch job postings from the database.
+   * Only fetches if the user is authenticated as an admin.
+   */
   const fetchJobs = useCallback(async () => {
-    // Only fetch if user is admin (avoids flicker on initial load before auth check)
     if (user?.role !== "admin") {
-      setIsLoadingJobs(false); // Stop loading if not admin
+      setIsLoadingJobs(false);
       return;
     }
     setIsLoadingJobs(true);
@@ -42,38 +51,47 @@ const AdminHomePage: React.FC = () => {
       const fetchedJobs = await getAllJobs();
       setJobs(fetchedJobs);
     } catch (error) {
-      console.error("Error fetching jobs:", error);
-      setJobs([]); // Set to empty array on error
+      setJobs([]);
     } finally {
       setIsLoadingJobs(false);
     }
-  }, [user]); // Depend on user
+  }, [user]);
 
+  /**
+   * Effect hook to fetch jobs on initial mount and when the user changes.
+   */
   useEffect(() => {
     fetchJobs();
-  }, [fetchJobs]); // Fetch jobs initially and when fetchJobs changes (due to user dependency)
+  }, [fetchJobs]);
 
-  // --- Handlers ---
+  /**
+   * Handles user logout by dispatching the logout action.
+   */
   const handleLogout = () => {
     dispatch(logout());
-    // Router replacement is handled by the auth guard effect
   };
 
+  /**
+   * Opens the job creation dialog.
+   */
   const handleCreateNewJobClick = () => {
     setIsDialogOpen(true);
-    console.log("Opening job creation drawer...");
   };
 
-  // Placeholder for status toggle - needs implementation in dbServices and proper state update
+  /**
+   * Memoized callback to handle toggling the status ('active'/'closed') of a job posting.
+   * Performs an optimistic UI update and then attempts to update the database.
+   * Reverts the UI update and shows an alert on database update failure.
+   * @param {string} jobId - The ID of the job to update.
+   * @param {'active' | 'closed' | 'draft'} currentStatus - The current status of the job.
+   */
   const handleStatusToggle = useCallback(
     async (jobId: string, currentStatus: "active" | "closed" | "draft") => {
-      // Don't allow toggling for draft jobs via this UI
       if (currentStatus === "draft") return;
 
       const newStatus = currentStatus === "active" ? "closed" : "active";
-      const originalJobs = [...jobs]; // Keep original state for potential revert
+      const originalJobs = [...jobs];
 
-      // --- Optimistic UI Update ---
       setJobs((prevJobs) =>
         prevJobs.map((job) =>
           job.id === jobId
@@ -89,44 +107,35 @@ const AdminHomePage: React.FC = () => {
         )
       );
 
-      // --- Actual DB Update ---
       try {
-        console.log(
-          `Attempting to update job ${jobId} status to ${newStatus}...`
-        );
-        const jobToUpdate = await getJobById(jobId); // Fetch the job data
+        const jobToUpdate = await getJobById(jobId);
         if (jobToUpdate) {
           const updatedJob: Job = {
             ...jobToUpdate,
             status: newStatus,
             list_card: {
-              // Update list card badge as well
               ...jobToUpdate.list_card,
               badge: newStatus === "active" ? "Active" : "Inactive",
             },
-            // Optionally update an 'updatedAt' timestamp here
           };
-          await addJob(updatedJob); // Use addJob (as put) to update the record
-          console.log(`Job ${jobId} status updated successfully in DB.`);
-          // Optional: If you prefer pessimistic updates, call fetchJobs() here instead of optimistic update
-          // fetchJobs();
+          await addJob(updatedJob);
         } else {
-          console.error(`Job ${jobId} not found for status update.`);
-          throw new Error(`Job ${jobId} not found.`); // Throw error to trigger catch block
+          throw new Error(`Job ${jobId} not found.`);
         }
       } catch (error) {
-        console.error(`Error updating job ${jobId} status in DB:`, error);
-        // Revert optimistic update on failure
         setJobs(originalJobs);
-        // TODO: Show an error message to the user (e.g., using a toast notification library)
         alert(`Failed to update job status for ${jobId}. Please try again.`);
-        throw error; // Re-throw if the JobCard needs to handle it (e.g., stop loading spinner)
+        throw error;
       }
     },
-    [jobs]
+    [jobs] // Removed addJob and getJobById as dependencies assuming they are stable service functions
   );
 
-  // Filter jobs based on search term (simple example)
+  /**
+   * Memoized array of jobs filtered based on the current `searchTerm`.
+   * Searches within job title, description, type, and status.
+   * @returns {Job[]} The filtered list of jobs.
+   */
   const filteredJobs = useMemo(() => {
     if (!searchTerm) {
       return jobs;
@@ -141,14 +150,13 @@ const AdminHomePage: React.FC = () => {
     );
   }, [jobs, searchTerm]);
 
-  // --- Render Logic ---
+  // Render null or loading indicator if auth check is in progress
   if (!user || user.role !== "admin") {
-    return null; // Or a loading indicator
+    return null;
   }
 
   return (
     <div className="flex flex-col h-screen bg-neutral-10 overflow-hidden font-sans">
-      {/* Header */}
       <header className="w-full h-16 bg-neutral-10 border-b border-neutral-40 flex-shrink-0">
         <div className="max-w-full h-full px-5 mx-auto flex justify-between items-center">
           <h1 className="text-neutral-100 text-xl font-bold">Job List</h1>
@@ -161,21 +169,23 @@ const AdminHomePage: React.FC = () => {
                 {user.name ? user.name.charAt(0).toUpperCase() : "A"}
               </div>
             </button>
+            <button
+              onClick={handleLogout}
+              className="p-1.5 text-neutral-60 hover:text-danger-main hover:bg-danger-surface rounded-full transition-colors sm:p-2"
+              title="Logout"
+            >
+              <UilSignout size="20" />
+            </button>
           </div>
         </div>
       </header>
 
-      {/* Main Content Area */}
       <main className="flex-1 overflow-hidden px-4 sm:px-6 pt-4 pb-4">
-        {" "}
-        {/* Added pb-4 */}
         <div className="flex flex-col lg:flex-row gap-4 h-full">
-          {/* Left Panel: Search and Job List / Empty State */}
           <div className="flex-1 flex flex-col gap-4 overflow-hidden h-full">
-            {/* Search Bar */}
             <div className="relative flex-shrink-0">
               <input
-                type="search" // Use search type
+                type="search"
                 placeholder="Search by job details"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -187,17 +197,12 @@ const AdminHomePage: React.FC = () => {
               </div>
             </div>
 
-            {/* Job List or Empty State Area */}
             <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-16 lg:pb-4">
-              {" "}
-              {/* Added bottom padding for potential FAB */}
               {isLoadingJobs ? (
                 <div className="flex justify-center items-center h-full">
                   <p className="text-neutral-60">Loading jobs...</p>
-                  {/* TODO: Add a spinner component */}
                 </div>
               ) : filteredJobs.length === 0 ? (
-                // Empty State or No Search Results
                 <div className="flex flex-col justify-center items-center gap-4 h-full text-center px-4">
                   <Image
                     src="/home-page-empty.png"
@@ -222,7 +227,6 @@ const AdminHomePage: React.FC = () => {
                         : "Create a job opening now and start the candidate process."}
                     </div>
                   </div>
-                  {/* Only show create button in empty state if not searching */}
                   {!searchTerm && (
                     <button
                       onClick={handleCreateNewJobClick}
@@ -235,15 +239,17 @@ const AdminHomePage: React.FC = () => {
                   )}
                 </div>
               ) : (
-                // Job List - Render JobCards
                 <div className="space-y-4">
                   {filteredJobs.map((job) => (
                     <JobCard
                       key={job.id}
                       job={job}
-                      // Pass the toggle handler (needs implementation details refined)
-                      onStatusToggle={() =>
-                        handleStatusToggle(job.id, job.status)
+                      onStatusToggle={
+                        () =>
+                          handleStatusToggle(
+                            job.id,
+                            job.status as "active" | "closed" | "draft"
+                          ) // Added type assertion
                       }
                     />
                   ))}
@@ -252,7 +258,6 @@ const AdminHomePage: React.FC = () => {
             </div>
           </div>
 
-          {/* Right Panel: Highlight Card (Hidden below lg screens) */}
           <div className="hidden lg:flex lg:flex-col justify-start items-center gap-6 flex-shrink-0 w-72">
             <div
               className="w-full p-6 rounded-2xl flex flex-col justify-center items-end gap-6 overflow-hidden bg-cover bg-center text-white"
@@ -260,7 +265,7 @@ const AdminHomePage: React.FC = () => {
                 backgroundImage: "url('/highlited-session.png')",
                 backgroundColor: "rgba(0,0,0,0.7)",
                 backgroundBlendMode: "multiply",
-              }} // Added fallback color and blend mode
+              }}
             >
               <div className="self-stretch flex flex-col justify-start items-start gap-1">
                 <div className="self-stretch justify-start text-neutral-40 text-lg font-bold">
@@ -279,12 +284,10 @@ const AdminHomePage: React.FC = () => {
                 </div>
               </button>
             </div>
-            {/* Potential other widgets or info can go here */}
           </div>
         </div>
       </main>
 
-      {/* Mobile FAB for Create Job (Optional - shown below lg breakpoint when jobs exist) */}
       {!isLoadingJobs && jobs.length > 0 && (
         <button
           onClick={handleCreateNewJobClick}
@@ -295,14 +298,12 @@ const AdminHomePage: React.FC = () => {
         </button>
       )}
 
-      {/* --- Job Creation Dialog --- */}
       <JobCreationDialog
         isOpen={isDialogOpen}
         onClose={() => setIsDialogOpen(false)}
-        onJobCreated={fetchJobs} // Pass fetchJobs to refresh the list
+        onJobCreated={fetchJobs}
       />
 
-      {/* Global Styles for Animations (can be moved to globals.css) */}
       <style jsx global>{`
         @keyframes fadeIn {
           from {
