@@ -17,7 +17,7 @@ export default function CandidatesPage() {
   };
 
   return (
-    <div className="container mx-auto py-10">
+    <div className="container mx-auto py-auto">
       <h1 className="text-3xl font-bold mb-6">Candidate Pipeline</h1>
 
       {/* 4. Render the generic table, passing in the

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { UilTimes, UilDollarSignAlt } from "@iconscout/react-unicons";
+import { UilTimes } from "@iconscout/react-unicons";
 import { addJob, getJobPostingConfiguration } from "@/services/dbServices"; // <<< Import addJob
 import {
   JobPostingConfiguration,
