@@ -800,7 +800,7 @@ function bufferToHex(buffer: ArrayBuffer): string {
 export async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashBuffer = await crypto.subtle?.digest("SHA-256", data);
   const hashHex = bufferToHex(hashBuffer);
   // console.log(`Hashing password "${password}" to ${hashHex.substring(0, 10)}...`); // Optional logging
   return hashHex;
