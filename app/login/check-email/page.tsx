@@ -53,7 +53,7 @@ const CheckEmailPage: React.FC = () => {
   return <CheckEmailDisplay email={email} context="login" />;
 };
 
-const CheckEmailMainPage = () => (
+const CheckEmailMainPage: React.FC = () => (
   <Suspense fallback={<div>Loading...</div>}>
     <CheckEmailPage />
   </Suspense>

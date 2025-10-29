@@ -225,7 +225,7 @@ const AuthenticationPage: React.FC = () => {
   );
 };
 
-const LoginPage = () => (
+const LoginPage: React.FC = () => (
   <Suspense fallback={<div>Loading...</div>}>
     <AuthenticationPage />
   </Suspense>

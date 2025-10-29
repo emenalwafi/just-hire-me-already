@@ -7,6 +7,9 @@ import {
   verifyLoginToken,
 } from "@/services/dbServices";
 
+// Define a key for localStorage
+const USER_STORAGE_KEY = "authUser";
+
 /**
  * Defines the shape of the authentication state managed by Redux.
  */
@@ -24,10 +27,30 @@ interface AuthState {
 }
 
 /**
+ * Helper function to safely get user from localStorage.
+ */
+const getUserFromLocalStorage = (): Omit<User, "hashedPassword"> | null => {
+  if (typeof window !== "undefined" && window.localStorage) {
+    const storedUser = localStorage.getItem(USER_STORAGE_KEY);
+    if (storedUser) {
+      try {
+        return JSON.parse(storedUser);
+      } catch (e) {
+        console.error("Failed to parse user from localStorage", e);
+        localStorage.removeItem(USER_STORAGE_KEY); // Clear invalid data
+        return null;
+      }
+    }
+  }
+  return null;
+};
+
+/**
  * The initial state for the authentication slice.
+ * Tries to load the user from localStorage on initialization.
  */
 const initialState: AuthState = {
-  user: null,
+  user: getUserFromLocalStorage(), // <-- Load user initially
   status: "idle",
   linkRequestStatus: "idle",
   error: null,
@@ -48,6 +71,10 @@ export const login = createAsyncThunk<
 >("auth/login", async (credentials, { rejectWithValue }) => {
   try {
     const user = await loginUser(credentials.email, credentials.plainPassword);
+    // Save user to localStorage on successful login
+    if (typeof window !== "undefined" && window.localStorage) {
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+    }
     return user;
   } catch (error: unknown) {
     if (error instanceof Error && error.message) {
@@ -96,7 +123,6 @@ export const requestEmailLink = createAsyncThunk<
   }
 });
 
-
 export const loginWithToken = createAsyncThunk<
   Omit<User, "hashedPassword"> | null,
   { token: string },
@@ -104,6 +130,10 @@ export const loginWithToken = createAsyncThunk<
 >("auth/loginWithToken", async ({ token }, { rejectWithValue }) => {
   try {
     const user = await verifyLoginToken(token);
+    // Save user to localStorage on successful token login
+    if (user && typeof window !== "undefined" && window.localStorage) {
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+    }
     return user;
   } catch (error: any) {
     console.error("Unexpected error during token login:", error);
@@ -120,7 +150,7 @@ const authSlice = createSlice({
   initialState,
   reducers: {
     /**
-     * Resets the authentication state to logged out.
+     * Resets the authentication state to logged out and clears localStorage.
      * @param {AuthState} state - The current auth state.
      */
     logout: (state) => {
@@ -128,6 +158,10 @@ const authSlice = createSlice({
       state.status = "idle";
       state.linkRequestStatus = "idle";
       state.error = null;
+      // Clear user from localStorage on logout
+      if (typeof window !== "undefined" && window.localStorage) {
+        localStorage.removeItem(USER_STORAGE_KEY);
+      }
       console.log("User logged out.");
     },
     /**
@@ -154,7 +188,6 @@ const authSlice = createSlice({
         state.error = null;
         state.linkRequestStatus = "idle";
       })
-      // Handle login success state
       .addCase(
         login.fulfilled,
         (state, action: PayloadAction<Omit<User, "hashedPassword">>) => {
@@ -163,13 +196,14 @@ const authSlice = createSlice({
           state.error = null;
         }
       )
-      // Handle login failure state
       .addCase(login.rejected, (state, action) => {
         state.status = "failed";
         state.user = null;
         state.error = action.payload;
+        if (typeof window !== "undefined" && window.localStorage) {
+          localStorage.removeItem(USER_STORAGE_KEY);
+        }
       })
-      // Handle register pending state
       .addCase(register.pending, (state) => {
         state.status = "loading";
         state.error = null;
@@ -177,9 +211,10 @@ const authSlice = createSlice({
       })
       .addCase(
         register.fulfilled,
-        (state, action: PayloadAction<Omit<User, "hashedPassword">>) => {
+        (
+          state
+        ) => {
           state.status = "succeeded";
-          state.user = action.payload;
           state.error = null;
         }
       )
@@ -205,33 +240,37 @@ const authSlice = createSlice({
         state.error = action.payload;
       })
       .addCase(loginWithToken.pending, (state) => {
-        state.status = "loading"; // Use general status for token login attempt
+        state.status = "loading";
         state.error = null;
-        state.linkRequestStatus = "idle"; // Reset link request status
-        state.linkToken = null; // Clear the token as it's being used/verified
+        state.linkRequestStatus = "idle";
+        state.linkToken = null;
       })
       .addCase(
         loginWithToken.fulfilled,
         (state, action: PayloadAction<Omit<User, "hashedPassword"> | null>) => {
+          state.linkToken = null; // Ensure token is cleared
           if (action.payload) {
-            // Verification successful, user data returned
             state.status = "succeeded";
-            state.user = action.payload;
+            state.user = action.payload; // User is already saved to localStorage in the thunk
             state.error = null;
           } else {
-            // Verification failed (invalid/expired token), service returned null
             state.status = "failed";
             state.user = null;
-            state.error = "Link sudah kadaluarsa, silahkan login kembali!"; // Set specific error
+            state.error = "Link sudah kadaluarsa, silahkan login kembali!";
+            if (typeof window !== "undefined" && window.localStorage) {
+              localStorage.removeItem(USER_STORAGE_KEY);
+            }
           }
-          state.linkToken = null; // Ensure token is cleared
         }
       )
       .addCase(loginWithToken.rejected, (state, action) => {
         state.status = "failed";
         state.user = null;
-        state.error = action.payload; // Error from rejectWithValue
-        state.linkToken = null; // Ensure token is cleared
+        state.error = action.payload;
+        state.linkToken = null;
+        if (typeof window !== "undefined" && window.localStorage) {
+          localStorage.removeItem(USER_STORAGE_KEY);
+        }
       });
   },
 });
