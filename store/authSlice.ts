@@ -18,6 +18,7 @@ interface AuthState {
   user: Omit<User, "hashedPassword"> | null;
   /** The current status of asynchronous operations (login, register). */
   status: "idle" | "loading" | "succeeded" | "failed";
+  /** The current status procees sending link to user */
   linkRequestStatus: "idle" | "loading" | "succeeded" | "failed";
   /** Stores potential error messages from failed async operations. */
   error: string | null | undefined;
@@ -29,16 +30,18 @@ interface AuthState {
  * Helper function to safely get user from localStorage.
  */
 const getUserFromLocalStorage = (): Omit<User, "hashedPassword"> | null => {
-  if (typeof window !== "undefined" && window.localStorage) {
-    const storedUser = localStorage.getItem(USER_STORAGE_KEY);
-    if (storedUser) {
-      try {
-        return JSON.parse(storedUser);
-      } catch (e) {
-        console.error("Failed to parse user from localStorage", e);
-        localStorage.removeItem(USER_STORAGE_KEY); // Clear invalid data
-        return null;
-      }
+  // Guard clause remains important
+  if (typeof window === "undefined" || !window.localStorage) {
+    return null;
+  }
+  const storedUser = localStorage.getItem(USER_STORAGE_KEY);
+  if (storedUser) {
+    try {
+      return JSON.parse(storedUser);
+    } catch (e) {
+      console.error("Failed to parse user from localStorage", e);
+      localStorage.removeItem(USER_STORAGE_KEY);
+      return null;
     }
   }
   return null;
@@ -49,7 +52,7 @@ const getUserFromLocalStorage = (): Omit<User, "hashedPassword"> | null => {
  * Tries to load the user from localStorage on initialization.
  */
 const initialState: AuthState = {
-  user: getUserFromLocalStorage(), // <-- Load user initially
+  user: null,
   status: "idle",
   linkRequestStatus: "idle",
   error: null,
@@ -157,7 +160,6 @@ const authSlice = createSlice({
       state.status = "idle";
       state.linkRequestStatus = "idle";
       state.error = null;
-      // Clear user from localStorage on logout
       if (typeof window !== "undefined" && window.localStorage) {
         localStorage.removeItem(USER_STORAGE_KEY);
       }
@@ -178,6 +180,22 @@ const authSlice = createSlice({
     resetLinkStatus: (state) => {
       state.linkRequestStatus = "idle";
       state.error = null;
+    },
+    /**
+     * New reducer to hydrate the state from localStorage.
+     * This will be dispatched from a useEffect hook on the client.
+     */
+    hydrateAuth: (state) => {
+      const user = getUserFromLocalStorage(); // Safely get user
+      if (user && !state.user) {
+        // Only hydrate if there's a user in storage and not already in state
+        state.user = user;
+        state.status = "succeeded"; // Update status if hydrating a user
+      } else if (!user && state.user) {
+        // Optional: If localStorage is cleared but state has user, log them out
+        // state.user = null;
+        // state.status = "idle";
+      }
     },
   },
   extraReducers: (builder) => {
@@ -203,6 +221,7 @@ const authSlice = createSlice({
           localStorage.removeItem(USER_STORAGE_KEY);
         }
       })
+      // ... (register cases remain the same)
       .addCase(register.pending, (state) => {
         state.status = "loading";
         state.error = null;
@@ -247,10 +266,10 @@ const authSlice = createSlice({
       .addCase(
         loginWithToken.fulfilled,
         (state, action: PayloadAction<Omit<User, "hashedPassword"> | null>) => {
-          state.linkToken = null; // Ensure token is cleared
+          state.linkToken = null;
           if (action.payload) {
             state.status = "succeeded";
-            state.user = action.payload; // User is already saved to localStorage in the thunk
+            state.user = action.payload; // Already saved in thunk
             state.error = null;
           } else {
             state.status = "failed";
@@ -274,6 +293,7 @@ const authSlice = createSlice({
   },
 });
 
-export const { logout, clearAuthError, resetLinkStatus } = authSlice.actions;
+export const { logout, clearAuthError, resetLinkStatus, hydrateAuth } =
+  authSlice.actions;
 
 export default authSlice.reducer;

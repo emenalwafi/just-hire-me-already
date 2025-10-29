@@ -1,22 +1,25 @@
 "use client";
 
 import React, { useEffect } from "react";
-import { Provider } from "react-redux";
-import { store } from "./store";
+import { Provider, useDispatch } from "react-redux";
+import { AppDispatch, store } from "./store";
 import { seedInitialData } from "@/services/dbServices";
+import { hydrateAuth } from "./authSlice";
 
 interface StoreProviderProps {
   children: React.ReactNode;
 }
 
 /**
- * A client component that wraps the application with the Redux Provider,
- * making the store available to all descendant components.
- * It also triggers the IndexedDB initial data seeding on mount.
- * @param {StoreProviderProps} props - Component props including children.
- * @returns {React.ReactElement} The Provider component wrapping the children.
+ * Internal component to handle client-side hydration after store is available.
  */
-export function StoreProvider({ children }: StoreProviderProps) {
+function HydrationHandler({ children }: { children: React.ReactNode }) {
+  const dispatch: AppDispatch = useDispatch();
+
+  useEffect(() => {
+    dispatch(hydrateAuth());
+  }, [dispatch]);
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       seedInitialData().catch((error) => {
@@ -25,5 +28,16 @@ export function StoreProvider({ children }: StoreProviderProps) {
     }
   }, []);
 
-  return <Provider store={store}>{children}</Provider>;
+  return <>{children}</>;
+}
+
+/**
+ * Wraps the application with Redux Provider and handles client-side hydration.
+ */
+export function StoreProvider({ children }: StoreProviderProps) {
+  return (
+    <Provider store={store}>
+      <HydrationHandler>{children}</HydrationHandler>
+    </Provider>
+  );
 }
