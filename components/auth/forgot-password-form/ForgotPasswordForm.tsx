@@ -123,7 +123,7 @@ const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
             type="button"
             onClick={onBackToLogin}
             disabled={isLoading}
-            className="py-1 rounded-lg inline-flex justify-center items-center gap-1 group focus:outline-none focus:ring-2 focus:ring-primary-focus disabled:opacity-50"
+            className="cursor-pointer py-1 rounded-lg inline-flex justify-center items-center gap-1 group focus:outline-none focus:ring-2 focus:ring-primary-focus disabled:opacity-50"
           >
             <UilArrowLeft
               size="18"
@@ -162,7 +162,7 @@ const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
               {errorMessage.includes("belum terdaftar") && (
                 <Link
                   href="/auth/register"
-                  className="text-danger-main text-sm font-bold hover:underline focus:outline-none focus:ring-1 focus:ring-danger-focus rounded"
+                  className="cursor-pointer text-danger-main text-sm font-bold hover:underline focus:outline-none focus:ring-1 focus:ring-danger-focus rounded"
                 >
                   Daftar
                 </Link>
@@ -189,7 +189,7 @@ const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
           <button
             type="submit"
             disabled={isLoading}
-            className="self-stretch mt-2 px-4 py-1.5 bg-secondary-main rounded-lg shadow-[0px_1px_2px_0px_rgba(0,0,0,0.12)] inline-flex justify-center items-center gap-1 hover:bg-secondary-hover focus:outline-none focus:ring-2 focus:ring-primary-focus focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="cursor-pointer self-stretch mt-2 px-4 py-1.5 bg-secondary-main rounded-lg shadow-[0px_1px_2px_0px_rgba(0,0,0,0.12)] inline-flex justify-center items-center gap-1 hover:bg-secondary-hover focus:outline-none focus:ring-2 focus:ring-primary-focus focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <span className="text-center justify-center text-neutral-90 text-lg font-bold">
               {isLoading ? "Mengirim..." : "Kirim email"}

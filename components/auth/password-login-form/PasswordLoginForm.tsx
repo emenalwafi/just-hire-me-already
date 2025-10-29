@@ -188,16 +188,24 @@ const PasswordLoginForm: React.FC<PasswordLoginFormProps> = ({
             role="alert"
           >
             <div className="text-center justify-center flex-1">
-              {" "}
-              <span className="text-danger-main text-sm">{errorMessage} </span>
-              {errorMessage.includes("belum terdaftar") && (
-                <Link
-                  href="/auth/register"
-                  className="text-danger-main text-sm font-bold hover:underline focus:outline-none focus:ring-1 focus:ring-danger-focus rounded"
-                >
-                  Daftar
-                </Link>
-              )}
+              {errorMessage.includes("belum terdaftar") ? (
+                <span className="text-danger-main text-sm">
+                  {errorMessage}{" "}
+                  <Link
+                    href="/auth/register"
+                    className="font-bold hover:underline focus:outline-none focus:ring-1 focus:ring-danger-focus rounded"
+                  >
+                    Daftar
+                  </Link>
+                </span>
+              ) : errorMessage.includes("sudah kadaluarsa") ? (
+                <span className="text-danger-main text-sm">
+                  Link <strong className="font-bold">sudah kadaluarsa</strong>,
+                  silahkan login kembali!
+                </span>
+              ) : errorMessage ? (
+                <span className="text-danger-main text-sm">{errorMessage}</span>
+              ) : null}
             </div>
           </div>
         )}

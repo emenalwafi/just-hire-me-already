@@ -19,6 +19,10 @@ import { v4 as uuidv4 } from "uuid"; // Import uuid for generating unique IDs
 const DB_NAME = "JobAppData";
 /** The current version of the IndexedDB database schema. Increment version for schema changes. */
 const DB_VERSION = 2;
+/** Login link token validity duration in milliseconds (30 minutes). */
+const LOGIN_TOKEN_VALIDITY_MS = 30 * 60 * 1000;
+/** Key prefix for storing login tokens in sessionStorage. */
+const LOGIN_TOKEN_PREFIX = "loginToken_";
 
 /**
  * Defines the schema structure for the Job Application IndexedDB database.
@@ -516,12 +520,14 @@ export async function loginUser(
 
   if (!user) {
     console.warn(`Login failed: Email "${email}" not found.`);
-    throw new Error("Invalid email or password.");
+    throw new Error(
+      "Email ini belum terdaftar sebagai akun di Rakamin Academy."
+    );
   }
 
   if (!user.hashedPassword) {
     console.error(`Login failed: User "${email}" has no password set.`);
-    throw new Error("User account is not properly configured.");
+    throw new Error("Invalid email or password.");
   }
 
   const isPasswordCorrect = await verifyPassword(
@@ -574,6 +580,97 @@ export async function registerUser(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { hashedPassword: _, ...userWithoutPassword } = newUser;
   return userWithoutPassword;
+}
+
+/**
+ * Simulates requesting a login link. Checks if the user exists.
+ * In a real app, this would generate a token and trigger an email.
+ * @param email The email address to send the link to.
+ * @returns The User object (without hash) if the email exists.
+ * @throws Error if the email is not found.
+ */
+export async function requestLoginLink(email: string): Promise<string> {
+  if (typeof window === "undefined" || typeof sessionStorage === "undefined") {
+    throw new Error("Session storage is not available.");
+  }
+
+  const user = await getUserByEmail(email);
+
+  if (!user) {
+    console.warn(`Login link request failed: Email "${email}" not found.`);
+    throw new Error(
+      "Email ini belum terdaftar sebagai akun di Rakamin Academy."
+    );
+  }
+
+  const token = uuidv4();
+  const expiresAt = Date.now() + LOGIN_TOKEN_VALIDITY_MS;
+
+  try {
+    const tokenData = JSON.stringify({ userId: user.id, expiresAt });
+    sessionStorage.setItem(`${LOGIN_TOKEN_PREFIX}${token}`, tokenData);
+    console.log(
+      `SIMULATING sending login link for user: ${user.email}. Token: ${token}`
+    );
+    return token;
+  } catch (error) {
+    console.error("Error storing login token in sessionStorage:", error);
+    throw new Error("Failed to prepare login link.");
+  }
+}
+
+/**
+ * Verifies a login token stored in sessionStorage.
+ * Checks for existence, expiry, and removes the token if valid.
+ * Fetches the user associated with the token if valid.
+ * @param token The login token from the URL.
+ * @returns The User object (without hash) if valid, null otherwise.
+ */
+export async function verifyLoginToken(
+  token: string
+): Promise<Omit<User, "hashedPassword"> | null> {
+  if (typeof window === "undefined" || typeof sessionStorage === "undefined") {
+    console.error("Cannot verify token: Session storage not available.");
+    return null;
+  }
+
+  const storageKey = `${LOGIN_TOKEN_PREFIX}${token}`;
+  const tokenDataString = sessionStorage.getItem(storageKey);
+
+  sessionStorage.removeItem(storageKey);
+
+  if (!tokenDataString) {
+    console.warn("Token verification failed: Token not found in storage.");
+    return null;
+  }
+
+  try {
+    const tokenData = JSON.parse(tokenDataString);
+    if (!tokenData.userId || !tokenData.expiresAt) {
+      console.warn("Token verification failed: Invalid token data format.");
+      return null;
+    }
+
+    if (Date.now() >= tokenData.expiresAt) {
+      console.warn("Token verification failed: Token expired.");
+      return null;
+    }
+
+    const user = await getUserById(tokenData.userId);
+    if (!user) {
+      console.error(
+        "Token verification failed: User associated with token not found."
+      );
+      return null;
+    }
+
+    console.log(`Token verification successful for user: ${user.email}`);
+    const { hashedPassword, ...userWithoutPassword } = user;
+    return userWithoutPassword;
+  } catch (error) {
+    console.error("Error during token verification:", error);
+    return null;
+  }
 }
 
 /**

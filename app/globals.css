@@ -124,6 +124,11 @@
   --text-lg: 16px;
   --text-lg--line-height: 28px;
 
+  /* X-Large */
+  /* Usage: text-xl */
+  --text-xl: 18px;
+  --text-xl--line-height: 28px;
+
   /* Small Heading */
   /* Usage: text-heading-sm */
   --text-heading-sm: 20px;
