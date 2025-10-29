@@ -219,12 +219,16 @@ const AuthenticationPage: React.FC = () => {
   };
 
   return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <div className="flex min-h-screen items-center justify-center bg-neutral-20 p-4 font-sans">
-        {renderForm()}
-      </div>
-    </Suspense>
+    <div className="flex min-h-screen items-center justify-center bg-neutral-20 p-4 font-sans">
+      {renderForm()}
+    </div>
   );
 };
 
-export default AuthenticationPage;
+const LoginPage = () => (
+  <Suspense fallback={<div>Loading...</div>}>
+    <AuthenticationPage />
+  </Suspense>
+);
+
+export default LoginPage;

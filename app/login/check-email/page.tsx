@@ -50,11 +50,13 @@ const CheckEmailPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, router, user, dispatch]); // Added user and dispatch
 
-  return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <CheckEmailDisplay email={email} context="login" />
-    </Suspense>
-  );
+  return <CheckEmailDisplay email={email} context="login" />;
 };
 
-export default CheckEmailPage;
+const CheckEmailMainPage = () => (
+  <Suspense fallback={<div>Loading...</div>}>
+    <CheckEmailPage />
+  </Suspense>
+);
+
+export default CheckEmailMainPage;
