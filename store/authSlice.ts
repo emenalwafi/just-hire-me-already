@@ -18,7 +18,6 @@ interface AuthState {
   user: Omit<User, "hashedPassword"> | null;
   /** The current status of asynchronous operations (login, register). */
   status: "idle" | "loading" | "succeeded" | "failed";
-  /** The current status procees sending link to user */
   linkRequestStatus: "idle" | "loading" | "succeeded" | "failed";
   /** Stores potential error messages from failed async operations. */
   error: string | null | undefined;
