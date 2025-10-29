@@ -63,7 +63,7 @@ const AuthenticationPage: React.FC = () => {
       try {
         const token = await dispatch(requestEmailLink({ email })).unwrap();
         if (token) {
-          router.push(`/login?verify=${token}`);
+          router.push(`/login/check-email?token=${token}&email=${email}`);
         }
       } catch (rejectedValueOrSerializedError) {}
     },
@@ -155,11 +155,14 @@ const AuthenticationPage: React.FC = () => {
     const token = searchParams.get("verify");
     if (user) {
       router.push("/");
+      return;
     }
 
-    if (token && !user) {
-      // Added !user check
+    if (token) {
       setTokenToVerify(token);
+    } else {
+      // If there's no token, ensure tokenToVerify is null
+      setTokenToVerify(null);
     }
   }, [searchParams, router, user]);
 

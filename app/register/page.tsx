@@ -1,22 +1,22 @@
+// app/register/page.tsx
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation"; // If needed for navigation after submit
+import { useRouter } from "next/navigation"; // Keep this
+import { useDispatch } from "react-redux"; // Import useDispatch
+import type { AppDispatch } from "@/store/store"; // Import AppDispatch type
+import { register, requestEmailLink } from "@/store/authSlice"; // Import register and requestEmailLink
 import Input from "@/components/input/Input";
 import {
   TextInputConfig,
   InputValue,
   UnifiedChangeValue,
 } from "@/types/InputConfig";
-import {
-  UilExclamationTriangle,
-  UilCheck,
-} from "@iconscout/react-unicons";
-import { getUserByEmail } from "@/services/dbServices"; // Import the DB service
+import { UilExclamationTriangle, UilCheck } from "@iconscout/react-unicons";
+import { getUserByEmail } from "@/services/dbServices";
 
-// Define states for email validation check
 type EmailCheckStatus =
   | "idle"
   | "checking"
@@ -28,56 +28,47 @@ const RegistrationPage: React.FC = () => {
   const [email, setEmail] = useState<InputValue>(null);
   const [emailCheckStatus, setEmailCheckStatus] =
     useState<EmailCheckStatus>("idle");
-  const [isLoading, setIsLoading] = useState(false); // For form submission loading state
-  const router = useRouter(); // If needed later
+  const [isLoading, setIsLoading] = useState(false);
+  const [submissionError, setSubmissionError] = useState<string | null>(null); // State for registration/link errors
+  const router = useRouter();
+  const dispatch: AppDispatch = useDispatch(); // Initialize useDispatch
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // --- Icons ---
   const errorIcon = (
     <UilExclamationTriangle size="16" className="text-danger-main" />
   );
-  const successIcon = (
-    <UilCheck size="16" className="text-success-main" />
-  );
+  const successIcon = <UilCheck size="16" className="text-success-main" />;
 
-  // --- Email Check Logic ---
+  // --- Email Check Logic (Keep as is) ---
   const checkEmailExistence = useCallback(async (emailToCheck: string) => {
     if (!emailToCheck || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailToCheck)) {
-      setEmailCheckStatus("invalid_format"); // Invalid format, don't check DB
+      setEmailCheckStatus("invalid_format");
       return;
     }
-
     setEmailCheckStatus("checking");
     try {
       const user = await getUserByEmail(emailToCheck);
       setEmailCheckStatus(user ? "exists" : "available");
     } catch (error) {
       console.error("Error checking email:", error);
-      setEmailCheckStatus("idle"); // Reset on error
+      setEmailCheckStatus("idle");
     }
   }, []);
 
-  // --- Debounced Effect for Email Check ---
+  // --- Debounced Effect for Email Check (Keep as is) ---
   useEffect(() => {
     const currentEmail = email as string | null;
-
-    // Clear previous timeout if user is still typing
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }
-
-    // Reset status if email is empty or just whitespace
     if (!currentEmail || currentEmail.trim() === "") {
       setEmailCheckStatus("idle");
       return;
     }
-
-    // Set a new timeout
     debounceTimeoutRef.current = setTimeout(() => {
       checkEmailExistence(currentEmail.trim());
-    }, 1000); // Check after 1 second of inactivity
-
-    // Cleanup function to clear timeout if component unmounts or email changes again
+    }, 1000);
     return () => {
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
@@ -85,118 +76,152 @@ const RegistrationPage: React.FC = () => {
     };
   }, [email, checkEmailExistence]);
 
-  // --- Input Change Handler ---
+  // --- Input Change Handler (Keep as is) ---
   const handleEmailChange = (value: UnifiedChangeValue) => {
     const newEmail = value as string | null;
     setEmail(newEmail);
-    // Reset status immediately on typing, debounce will trigger check later
+    setSubmissionError(null); // Clear submission error on type
     if (emailCheckStatus !== "checking") {
       setEmailCheckStatus("idle");
     }
   };
 
-  // --- Form Submission Handler ---
+  // --- *** UPDATED Form Submission Handler *** ---
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setIsLoading(true);
-    const emailValue = email as string | null;
+    setSubmissionError(null); // Clear previous errors
+    const emailValue = (email as string | null)?.trim();
 
-    // Final check before submission
+    // 1. Final Validation Check
     if (!emailValue || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue)) {
       setEmailCheckStatus("invalid_format");
       setIsLoading(false);
       return;
     }
 
-    // Explicitly re-check existence right before submitting in case debounce didn't finish
-    // or state is somehow stale.
+    // 2. Re-check email existence just before submission
     try {
-      const user = await getUserByEmail(emailValue);
-      if (user) {
+      const existingUser = await getUserByEmail(emailValue);
+      if (existingUser) {
         setEmailCheckStatus("exists");
         setIsLoading(false);
         return;
       }
-      // Ensure status is available before proceeding
-      if (emailCheckStatus !== "available" && !user) {
-        // If check result wasn't 'available' but user doesn't exist now, update status
+      // Explicitly set to available if it wasn't already and no user found
+      if (emailCheckStatus !== "available") {
         setEmailCheckStatus("available");
-        // It's safe to proceed below
       }
     } catch (error) {
-      console.error("Error checking email on submit:", error);
-      setEmailCheckStatus("idle"); // Reset on error
+      console.error("Error re-checking email on submit:", error);
+      setSubmissionError("Could not verify email status. Please try again.");
+      setEmailCheckStatus("idle");
       setIsLoading(false);
-      return; // Stop submission on error
+      return;
     }
 
-    // Proceed if email is valid and available
-    console.log("Submitting registration for:", emailValue);
-    // TODO: Implement actual registration logic (e.g., send magic link, navigate)
-    alert("Registration logic (e.g., sending magic link) not implemented yet.");
+    // 3. Register User with Default Password
+    try {
+      // Use email as default name for simplicity, assume 'candidate' role
+      await dispatch(
+        register({
+          email: emailValue,
+          name: emailValue.split("@")[0] || "New User", // Basic default name
+          plainPassword: "password", // Your specified default password
+          role: "candidate",
+        })
+      ).unwrap(); // unwrap() throws if rejected
 
-    // Simulate API call delay
-    setTimeout(() => {
-      // Example: Navigate to a confirmation page or show success message
-      // router.push('/register/check-email');
+      console.log("User registered successfully with default password.");
+
+      // 4. Request Login Link for the newly registered user
+      try {
+        const token = await dispatch(
+          requestEmailLink({ email: emailValue })
+        ).unwrap(); // unwrap() throws if rejected
+
+        console.log("Login link requested successfully. Token:", token);
+
+        // 5. Redirect to an intermediary page (create this next)
+        router.push(`/register/check-email?token=${token}&email=${emailValue}`);
+        // No need to setIsLoading(false) here as we are navigating away
+      } catch (linkError: any) {
+        console.error(
+          "Error requesting login link after registration:",
+          linkError
+        );
+        // Show error, maybe let user retry requesting link?
+        setSubmissionError(
+          linkError || "Failed to generate login link after registration."
+        );
+        setIsLoading(false);
+      }
+    } catch (registerError: any) {
+      console.error("Error during registration:", registerError);
+      // If registration failed (e.g., email somehow became taken between check and register),
+      // update the status and show error.
+      if (registerError?.includes("already exists")) {
+        setEmailCheckStatus("exists");
+      } else {
+        setSubmissionError(
+          registerError || "Registration failed. Please try again."
+        );
+      }
       setIsLoading(false);
-    }, 1500);
+    }
   };
+  // --- END UPDATED Form Submission Handler ---
 
-  // --- Google Registration Handler ---
+  // --- Google Registration Handler (Keep as is) ---
   const handleGoogleRegister = useCallback(() => {
     console.log("Initiating Google Register...");
-    // TODO: Implement Google Sign-up logic
     alert("Google Register functionality not yet implemented.");
-    setEmailCheckStatus("idle"); // Clear any email checks
+    setEmailCheckStatus("idle");
   }, []);
 
-  // --- Input Config ---
+  // --- Input Config (Keep as is, error handling updated) ---
   const emailConfig: TextInputConfig = {
     type: "email",
     name: "email",
     label: "Alamat email",
     placeholder: "Masukkan alamat email",
     required: true,
-    // Show local format error preferentially, otherwise reflect global error state visually
     error:
       emailCheckStatus === "invalid_format"
         ? "Format email tidak valid"
-        : emailCheckStatus === "exists",
-    // Only show success message when status is 'available'
+        : emailCheckStatus === "exists" || !!submissionError, // Show red border for submission errors too
     successMessage:
-      emailCheckStatus === "available"
-        ? "Alamat email teridentifikasi"
+      emailCheckStatus === "available" && !submissionError
+        ? "Alamat email tersedia" // Updated success message
         : undefined,
-    successIcon: emailCheckStatus === "available" ? successIcon : undefined,
+    successIcon:
+      emailCheckStatus === "available" && !submissionError
+        ? successIcon
+        : undefined,
     errorIcon:
-      emailCheckStatus === "invalid_format" || emailCheckStatus === "exists"
+      emailCheckStatus === "invalid_format" ||
+      emailCheckStatus === "exists" ||
+      !!submissionError
         ? errorIcon
         : undefined,
   };
 
+  // --- JSX (Add display for submissionError) ---
   return (
-    // Centering the content vertically and horizontally
     <div className="flex min-h-screen items-center justify-center bg-neutral-20 p-4 font-sans">
-      {/* Form Container */}
       <div className="flex w-full max-w-md flex-col items-start gap-6">
-        {/* Logo */}
         <Link href="/" aria-label="Go to homepage">
           <Image
             src="/rakamin-logo.png"
             alt="Rakamin Logo"
             width={144}
-            height={48} // Adjusted height based on original img tag
+            height={48}
             priority
           />
         </Link>
-        {/* Card */}
         <div className="w-full md:w-[500px] rounded-lg bg-neutral-10 p-6 shadow-[0px_1px_2px_0px_rgba(0,0,0,0.12)] sm:p-8 md:p-10 flex flex-col items-start gap-4">
-          {/* Header */}
           <div className="self-stretch flex flex-col justify-start items-start gap-2">
             <h1 className="text-neutral-100 text-heading-sm font-bold">
-              {" "}
-              {/* Using heading-sm as per design system */}
               Bergabung dengan Rakamin
             </h1>
             <div className="self-stretch">
@@ -212,27 +237,36 @@ const RegistrationPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Global Error Message - Email Exists */}
-          {emailCheckStatus === "exists" && (
+          {/* Combined Error Display Area */}
+          {(emailCheckStatus === "exists" || submissionError) && (
             <div
               className="self-stretch px-2 py-0.5 bg-danger-surface rounded outline outline-1 outline-offset-[-1px] outline-danger-border inline-flex justify-center items-center gap-1"
               role="alert"
             >
               <div className="text-center justify-center flex-1">
-                <span className="text-danger-main text-sm">
-                  Email ini sudah terdaftar sebagai akun di Rakamin Academy.{" "}
-                </span>
-                <Link
-                  href="/login"
-                  className="text-danger-main text-sm font-bold hover:underline focus:outline-none focus:ring-1 focus:ring-danger-focus rounded"
-                >
-                  Masuk
-                </Link>
+                {emailCheckStatus === "exists" ? (
+                  <>
+                    <span className="text-danger-main text-sm">
+                      Email ini sudah terdaftar.{" "}
+                    </span>
+                    <Link
+                      href="/login"
+                      className="text-danger-main text-sm font-bold hover:underline focus:outline-none focus:ring-1 focus:ring-danger-focus rounded"
+                    >
+                      Masuk
+                    </Link>
+                  </>
+                ) : (
+                  submissionError && (
+                    <span className="text-danger-main text-sm">
+                      {submissionError}
+                    </span>
+                  )
+                )}
               </div>
             </div>
           )}
 
-          {/* Form */}
           <form
             onSubmit={handleSubmit}
             className="self-stretch flex flex-col gap-4"
@@ -243,9 +277,12 @@ const RegistrationPage: React.FC = () => {
               onChange={handleEmailChange}
             />
 
-            {/* Submit Button */}
             <button
               type="submit"
+              // Disable button based on email status or loading state
+              disabled={
+                isLoading
+              }
               className="self-stretch cursor-pointer px-4 py-1.5 bg-secondary-main rounded-lg shadow-[0px_1px_2px_0px_rgba(0,0,0,0.12)] inline-flex justify-center items-center gap-1 hover:bg-secondary-hover focus:outline-none focus:ring-2 focus:ring-secondary-focus focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <span className="text-center justify-center text-neutral-90 text-lg font-bold">
@@ -254,21 +291,18 @@ const RegistrationPage: React.FC = () => {
             </button>
           </form>
 
-          {/* Separator */}
+          {/* Separator and Google Button (Keep as is) */}
           <div className="self-stretch inline-flex justify-center items-center gap-3">
             <div className="flex-1 h-0 outline outline-1 outline-offset-[-0.50px] outline-neutral-60"></div>
             <span className="justify-end text-neutral-60 text-sm">or</span>
             <div className="flex-1 h-0 outline outline-1 outline-offset-[-0.50px] outline-neutral-60"></div>
           </div>
-
-          {/* Google Register Button */}
           <button
             type="button"
             onClick={handleGoogleRegister}
-            disabled={isLoading} // Disable during email submission
+            disabled={isLoading}
             className="cursor-pointer self-stretch px-6 py-3 bg-neutral-10 rounded-lg outline outline-2 outline-offset-[-2px] outline-neutral-40/50 inline-flex justify-center items-center gap-2.5 overflow-hidden hover:bg-neutral-20 focus:outline-none focus:ring-2 focus:ring-primary-focus focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {/* Using provided Google icon SVG */}
             <Image
               src="/google-icon.svg"
               alt="google-icon"
@@ -276,10 +310,7 @@ const RegistrationPage: React.FC = () => {
               height={24}
               aria-hidden="true"
             />
-
             <span className="justify-center text-neutral-100 text-base font-bold">
-              {" "}
-              {/* Adjusted text color */}
               Daftar dengan Google
             </span>
           </button>

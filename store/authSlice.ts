@@ -96,6 +96,7 @@ export const requestEmailLink = createAsyncThunk<
   }
 });
 
+
 export const loginWithToken = createAsyncThunk<
   Omit<User, "hashedPassword"> | null,
   { token: string },
