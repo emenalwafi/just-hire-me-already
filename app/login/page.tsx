@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
 import type { RootState, AppDispatch } from "@/store/store";
@@ -219,9 +219,11 @@ const AuthenticationPage: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-neutral-20 p-4 font-sans">
-      {renderForm()}
-    </div>
+    <Suspense fallback={<div>Loading...</div>}>
+      <div className="flex min-h-screen items-center justify-center bg-neutral-20 p-4 font-sans">
+        {renderForm()}
+      </div>
+    </Suspense>
   );
 };
 
