@@ -7,7 +7,7 @@ import Image from "next/image";
 import { UilSearch, UilPlus } from "@iconscout/react-unicons"; // Added UilPlus for potential FAB
 import type { RootState, AppDispatch } from "@/store/store";
 import { logout } from "@/store/authSlice";
-import { getAllJobs, addJob } from "@/services/dbServices"; // Assuming addJob exists for status toggle later
+import { getAllJobs, addJob, getJobById } from "@/services/dbServices"; // Assuming addJob exists for status toggle later
 import type { Job } from "@/types/dbTypes";
 import JobCard from "@/components/admin/job-card/JobCard"; // <<< Import JobCard
 import JobCreationDialog from "@/components/admin/job-creation-dialog/JobCreationDialog";
@@ -65,31 +65,66 @@ const AdminHomePage: React.FC = () => {
   };
 
   // Placeholder for status toggle - needs implementation in dbServices and proper state update
-  const handleStatusToggle = async (
-    jobId: string,
-    currentStatus: "active" | "closed" | "draft"
-  ) => {
-    if (currentStatus === "draft") return; // Cannot toggle draft status from here
-    const newStatus = currentStatus === "active" ? "closed" : "active";
-    console.log(`TODO: Update job ${jobId} status to ${newStatus}`);
-    // Find the job, update its status, save it back
-    const jobToUpdate = jobs.find((j) => j.id === jobId);
-    if (jobToUpdate) {
-      const updatedJob = { ...jobToUpdate, status: newStatus };
+  const handleStatusToggle = useCallback(
+    async (jobId: string, currentStatus: "active" | "closed" | "draft") => {
+      // Don't allow toggling for draft jobs via this UI
+      if (currentStatus === "draft") return;
+
+      const newStatus = currentStatus === "active" ? "closed" : "active";
+      const originalJobs = [...jobs]; // Keep original state for potential revert
+
+      // --- Optimistic UI Update ---
+      setJobs((prevJobs) =>
+        prevJobs.map((job) =>
+          job.id === jobId
+            ? {
+                ...job,
+                status: newStatus,
+                list_card: {
+                  ...job.list_card,
+                  badge: newStatus === "active" ? "Active" : "Inactive",
+                },
+              }
+            : job
+        )
+      );
+
+      // --- Actual DB Update ---
       try {
-        // await addJob(updatedJob); // Using addJob (which uses put) to update
-        // fetchJobs(); // Re-fetch to confirm update
-        // Optimistic UI update:
-        // setJobs((prevJobs) =>
-        //   prevJobs.map((j) => (j.id === jobId ? updatedJob : j))
-        // );
-        // Note: Need proper error handling if DB update fails
+        console.log(
+          `Attempting to update job ${jobId} status to ${newStatus}...`
+        );
+        const jobToUpdate = await getJobById(jobId); // Fetch the job data
+        if (jobToUpdate) {
+          const updatedJob: Job = {
+            ...jobToUpdate,
+            status: newStatus,
+            list_card: {
+              // Update list card badge as well
+              ...jobToUpdate.list_card,
+              badge: newStatus === "active" ? "Active" : "Inactive",
+            },
+            // Optionally update an 'updatedAt' timestamp here
+          };
+          await addJob(updatedJob); // Use addJob (as put) to update the record
+          console.log(`Job ${jobId} status updated successfully in DB.`);
+          // Optional: If you prefer pessimistic updates, call fetchJobs() here instead of optimistic update
+          // fetchJobs();
+        } else {
+          console.error(`Job ${jobId} not found for status update.`);
+          throw new Error(`Job ${jobId} not found.`); // Throw error to trigger catch block
+        }
       } catch (error) {
-        console.error("Failed to update job status:", error);
-        // Revert optimistic update or show error message
+        console.error(`Error updating job ${jobId} status in DB:`, error);
+        // Revert optimistic update on failure
+        setJobs(originalJobs);
+        // TODO: Show an error message to the user (e.g., using a toast notification library)
+        alert(`Failed to update job status for ${jobId}. Please try again.`);
+        throw error; // Re-throw if the JobCard needs to handle it (e.g., stop loading spinner)
       }
-    }
-  };
+    },
+    [jobs]
+  );
 
   // Filter jobs based on search term (simple example)
   const filteredJobs = useMemo(() => {
