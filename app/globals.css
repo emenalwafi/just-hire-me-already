@@ -165,13 +165,16 @@
   }
 }
 
+/* ======================================================================== */
+/* CUSTOM UTILITIES                                                       */
+/* ======================================================================== */
 @layer utilities {
   .custom-scrollbar {
     /* For Firefox */
     scrollbar-width: thin;
     scrollbar-color: theme(--color-primary-main) theme(--color-neutral-10);
 
-    /* For Chrome, Safari, and Edge */
+    /* For Chrome, Safari, Edge */
     &::-webkit-scrollbar {
       width: 8px;
       /* Width of the vertical scrollbar */
@@ -187,6 +190,11 @@
     &::-webkit-scrollbar-thumb {
       background-color: theme(--color-primary-main);
       border-radius: 100vh;
+      border: 1px solid theme(--color-neutral-10);
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+      background-color: theme(--color-primary-hover);
     }
   }
 }

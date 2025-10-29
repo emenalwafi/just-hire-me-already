@@ -1,5 +1,6 @@
 import React from "react";
 import TextInput from "@/components/input/text-input/TextInput";
+import TextAreaInput from "@/components/input/text-area-input/TextAreaInput";
 import RadioInput from "@/components/input/radio-input/RadioInput";
 import DropdownInput from "@/components/input/dropdown-input/DropdownInput";
 import DatePicker from "@/components/input/date-picker/DatePicker";
@@ -11,6 +12,8 @@ import {
   InputOnChange,
   TextInputValue,
   TextInputComponentOnChange,
+  TextAreaValue,
+  TextAreaComponentOnChange,
   RadioValue,
   RadioOnChange,
   DropdownValue,
@@ -20,6 +23,7 @@ import {
   PhoneValue,
   PhoneOnChange,
   PhoneCountryChange,
+  TextInputConfig,
 } from "@/types/InputConfig";
 
 /**
@@ -71,6 +75,7 @@ const Input: React.FC<InputProps> = ({
         onChange(event.target.value);
       };
       const { successIcon, errorIcon } = config;
+      const textConfig = config as TextInputConfig;
       return (
         <TextInput
           label={label}
@@ -80,12 +85,38 @@ const Input: React.FC<InputProps> = ({
           name={name}
           value={value as TextInputValue}
           onChange={handleTextChange}
-          type={config.type}
+          type={textConfig.type}
+          placeholder={textConfig.placeholder}
+          successMessage={textConfig.successMessage}
+          successIcon={textConfig.successIcon}
+          errorIcon={textConfig.errorIcon}
+          maxLength={textConfig.maxLength}
+          prefixCustom={textConfig.prefixCustom}
+        />
+      );
+
+    case "textarea":
+      // Use specific onChange type for TextAreaInput
+      const handleTextAreaChange: TextAreaComponentOnChange = (event) => {
+        onChange(event.target.value);
+      };
+      // Destructure icons specific to TextAreaInputConfig
+      const { successIcon: taSuccessIcon, errorIcon: taErrorIcon } = config;
+      return (
+        <TextAreaInput
+          label={label}
+          required={required}
+          disabled={disabled}
+          error={error}
+          name={name}
+          value={value as TextAreaValue} // Cast value
+          onChange={handleTextAreaChange} // Use adapted handler
           placeholder={config.placeholder}
-          successMessage={config.successMessage}
-          successIcon={successIcon}
-          errorIcon={errorIcon}
+          rows={config.rows}
           maxLength={config.maxLength}
+          successMessage={config.successMessage}
+          successIcon={taSuccessIcon}
+          errorIcon={taErrorIcon}
         />
       );
 
@@ -103,6 +134,7 @@ const Input: React.FC<InputProps> = ({
         />
       );
 
+    case "select":
     case "dropdown":
       return (
         <DropdownInput

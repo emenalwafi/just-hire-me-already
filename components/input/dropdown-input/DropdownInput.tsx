@@ -62,7 +62,7 @@ const DropdownInput: React.FC<DropdownInputProps> = ({
   const { popoverElement } = useDropdownPopover({
     anchorRef: triggerRef,
     options: options,
-    selectedValue: value?.id,
+    selectedValue: value?.value,
     searchTerm: inputValue,
     onSelectOption: (option) => {
       isSelectionInProgress.current = true;

@@ -1,111 +1,94 @@
-import React, { useState, InputHTMLAttributes } from "react";
-import { UilCheckCircle, UilEye, UilEyeSlash } from "@iconscout/react-unicons";
+import React, { useState, TextareaHTMLAttributes } from "react";
+import { UilCheckCircle } from "@iconscout/react-unicons";
 
 /**
- * Props for the `TextInput` component.
- * Extends standard HTML input attributes while omitting and redefining
- * `onChange`, `value`, and `type` for controlled component behavior.
+ * Props for the `TextAreaInput` component.
+ * Extends standard HTML textarea attributes, omitting and redefining `onChange` and `value`.
  */
-interface TextInputProps
+interface TextAreaInputProps
   extends Omit<
-    InputHTMLAttributes<HTMLInputElement>,
-    "onChange" | "value" | "type"
+    TextareaHTMLAttributes<HTMLTextAreaElement>,
+    "onChange" | "value"
   > {
-  /** The current value of the input. */
+  /** The current value of the textarea. */
   value: string | null;
-  /** Callback function fired when the input value changes. */
-  onChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  /** Optional label displayed above the input. */
+  /** Callback function fired when the textarea value changes. */
+  onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  /** Optional label displayed above the textarea. */
   label?: string;
   /** Indicates if the input is required (adds a visual indicator). */
   required?: boolean;
   /** Sets the error state. A boolean shows a red border; a string also shows an error message. */
   error?: boolean | string;
-  /** Optional success message to display below the input. */
+  /** Optional success message to display below the textarea. */
   successMessage?: string;
   /** Optional custom icon node to display next to the success message. Defaults to a checkmark. */
   successIcon?: React.ReactNode;
   /** Optional custom icon node to display next to the error message. */
   errorIcon?: React.ReactNode;
-  /** The functional type of the input, which determines behavior (e.g., password toggle). */
-  type?: "text" | "email" | "url" | "password" | "number" | "search";
-  /** Optional React node to display as a prefix inside the input container. */
-  prefixCustom?: React.ReactNode;
+  /** Number of visible text lines for the textarea. Defaults to 3. */
+  rows?: number;
 }
 
 /**
- * A styled text input component.
+ * A styled textarea input component for multi-line text entry.
  *
- * This component provides a fully-featured text input with support for labels,
- * required fields, error and success states, and a visibility toggle for password fields.
- * It wraps a standard HTML `<input>` and applies styling based on its state.
+ * Modeled after TextInput, it supports labels, required fields, error/success states,
+ * and standard textarea attributes like `rows`.
  *
- * @param {TextInputProps} props - The component props.
- * @returns {React.ReactElement} The rendered TextInput component.
+ * @param {TextAreaInputProps} props - The component props.
+ * @returns {React.ReactElement} The rendered TextAreaInput component.
  */
-const TextInput: React.FC<TextInputProps> = ({
+const TextAreaInput: React.FC<TextAreaInputProps> = ({
   value,
   onChange,
   label,
   required = false,
-  placeholder = "Enter value",
+  placeholder = "Enter text",
   disabled = false,
   error = false,
   successMessage,
   successIcon,
   errorIcon,
-  type = "text",
-  prefixCustom,
+  rows = 3, // Default to 3 rows
   className,
   ...rest
 }) => {
   const [isFocused, setIsFocused] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
 
-  const inputType = type === "password" && showPassword ? "text" : type;
-
+  // --- Class Calculation Logic (similar to TextInput) ---
   let containerClasses =
-    "self-stretch h-10 px-4 py-2 rounded-lg outline outline-2 outline-offset-[-2px] inline-flex items-center gap-2 overflow-hidden transition-colors w-full";
-  let inputClasses =
-    "flex-1 w-full bg-transparent border-none outline-none focus:outline-none p-0 text-base placeholder:text-neutral-60";
+    "self-stretch px-4 py-2 rounded-lg outline outline-2 outline-offset-[-2px] inline-flex items-start gap-2 overflow-hidden transition-colors w-full"; // items-start for textarea
+  let textAreaClasses =
+    "flex-1 w-full bg-transparent border-none outline-none focus:outline-none p-0 text-base placeholder:text-neutral-60 resize-none"; // Added resize-none
   let labelClasses = "text-neutral-90 text-sm";
   let caretColorClass = "";
-  let iconColorClass = "text-neutral-100";
-  let prefixColorClass = "text-neutral-90";
+
+  // Adjust height based on focus/content - use min-h based on rows, allow growth
+  containerClasses += ` min-h-[${(rows * 1.5 + 1).toFixed(2)}rem]`; // Estimate min-height based on rows + padding (adjust multiplier as needed)
 
   if (disabled) {
     containerClasses += " bg-neutral-30 outline-neutral-40 cursor-not-allowed";
-    inputClasses += " text-neutral-60 cursor-not-allowed";
+    textAreaClasses += " text-neutral-60 cursor-not-allowed";
     labelClasses += " text-neutral-60";
-    iconColorClass = "text-neutral-60";
-    prefixColorClass = "text-neutral-60";
   } else if (error) {
     containerClasses += " bg-white outline-danger-main";
-    inputClasses += " text-neutral-90";
+    textAreaClasses += " text-neutral-90";
     caretColorClass = "caret-danger-main";
-    prefixColorClass = "text-neutral-90";
   } else if (isFocused) {
     containerClasses += " bg-white outline-primary-main";
-    inputClasses += " text-neutral-90";
+    textAreaClasses += " text-neutral-90";
     caretColorClass = "caret-primary-main";
-    prefixColorClass = "text-neutral-90";
   } else {
     containerClasses +=
       " bg-neutral-10 outline-neutral-40 hover:outline-primary-main";
-    inputClasses += value ? " text-neutral-90" : " text-neutral-60";
-    prefixColorClass = value ? "text-neutral-90" : "text-neutral-60";
+    textAreaClasses += value ? " text-neutral-90" : " text-neutral-60";
   }
 
   const hasErrorMessage = typeof error === "string";
   const hasSuccessMessage = !error && successMessage;
   const showMessageContainer =
     !disabled && (hasErrorMessage || hasSuccessMessage);
-
-  const togglePasswordVisibility = () => {
-    if (!disabled) {
-      setShowPassword((prev) => !prev);
-    }
-  };
 
   const defaultSuccessIcon = (
     <UilCheckCircle size="16" className="text-primary-main flex-shrink-0" />
@@ -129,20 +112,17 @@ const TextInput: React.FC<TextInputProps> = ({
         </div>
       )}
 
-      {/* Input Container */}
+      {/* Textarea Container */}
       <div className={containerClasses}>
-        {prefixCustom && (
-          <span className={`flex-shrink-0 ${prefixColorClass}`}>{prefixCustom}</span>
-        )}
-        <input
-          type={inputType}
+        <textarea
           value={value || ""}
           onChange={onChange}
           placeholder={placeholder}
           disabled={disabled}
           onFocus={() => !disabled && setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
-          className={`${inputClasses} ${caretColorClass}`}
+          rows={rows} // Use the rows prop
+          className={`${textAreaClasses} ${caretColorClass}`}
           aria-required={required}
           aria-invalid={!!error}
           aria-describedby={
@@ -150,31 +130,13 @@ const TextInput: React.FC<TextInputProps> = ({
           }
           {...rest}
         />
-        {/* Trailing Icon Slot - Password Toggle */}
-        {type === "password" && (
-          <button
-            type="button"
-            onClick={togglePasswordVisibility}
-            disabled={disabled}
-            className={`focus:outline-none p-1 -m-1 ${
-              disabled ? "cursor-not-allowed" : "cursor-pointer"
-            }`}
-            aria-label={showPassword ? "Hide password" : "Show password"}
-          >
-            {showPassword ? (
-              <UilEyeSlash size="16" className={iconColorClass} />
-            ) : (
-              <UilEye size="16" className={iconColorClass} />
-            )}
-          </button>
-        )}
       </div>
 
-      {/* Helper/Error/Success Message - Conditionally Rendered */}
+      {/* Helper/Error/Success Message */}
       {showMessageContainer && (
         <div
           id={`${rest.id || rest.name}-message`}
-          className="self-stretch min-h-[1.25rem] inline-flex justify-start items-center gap-1"
+          className="self-stretch min-h-[1.25rem] inline-flex justify-start items-center gap-1" // Adjusted alignment slightly
           role={hasErrorMessage ? "alert" : undefined}
           aria-live={hasErrorMessage ? "assertive" : undefined}
         >
@@ -191,7 +153,7 @@ const TextInput: React.FC<TextInputProps> = ({
             </div>
           )}
 
-          {/* Render Success Icon (passed prop or default) */}
+          {/* Render Success Icon */}
           {hasSuccessMessage && (
             <span className="flex-shrink-0 w-4 h-4 text-primary-main">
               {successIcon || defaultSuccessIcon}
@@ -209,4 +171,4 @@ const TextInput: React.FC<TextInputProps> = ({
   );
 };
 
-export default TextInput;
+export default TextAreaInput;

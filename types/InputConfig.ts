@@ -36,10 +36,33 @@ export interface TextInputConfig extends BaseInputConfig {
   successMessage?: string;
   /** Optional custom icon node to display next to the success message. Defaults to a checkmark. */
   successIcon?: React.ReactNode;
-   /** Optional custom icon node to display next to the error message. */
+  /** Optional custom icon node to display next to the error message. */
   errorIcon?: React.ReactNode;
   /** Maximum number of characters allowed in the input. */
   maxLength?: number;
+  /** Custom icon node to display next to the input  */
+  prefixCustom?: React.ReactNode;
+}
+
+/**
+ * Configuration specific to the `TextAreaInput` component.
+ * Extends {@link BaseInputConfig}.
+ */
+export interface TextAreaInputConfig extends BaseInputConfig {
+  /** The type identifier for textarea inputs. */
+  type: "textarea";
+  /** Placeholder text displayed when the input is empty. */
+  placeholder?: string;
+  /** Optional success message displayed below the input when valid. */
+  successMessage?: string;
+  /** Optional custom icon node to display next to the success message. Defaults to a checkmark. */
+  successIcon?: React.ReactNode;
+  /** Optional custom icon node to display next to the error message. */
+  errorIcon?: React.ReactNode;
+  /** Maximum number of characters allowed in the input. */
+  maxLength?: number;
+  /** Number of visible text lines for the textarea. */
+  rows?: number;
 }
 
 /**
@@ -63,7 +86,7 @@ export interface RadioInputConfig extends BaseInputConfig {
  */
 export interface DropdownInputConfig extends BaseInputConfig {
   /** The type identifier for dropdown inputs. */
-  type: "dropdown";
+  type: "dropdown" | "select";
   /** An array of options available for selection in the dropdown. */
   options: DropdownOption[];
   /** Placeholder text displayed when no option is selected. */
@@ -124,6 +147,7 @@ export type InputConfig =
   | RadioInputConfig
   | DropdownInputConfig
   | DatePickerConfig
+  | TextAreaInputConfig
   | PhoneNumberInputConfig;
 
 /**
@@ -153,6 +177,13 @@ export type TextInputValue = string | null;
 /** The `onChange` signature expected by the `TextInput` component. */
 export type TextInputComponentOnChange = (
   event: React.ChangeEvent<HTMLInputElement>
+) => void;
+
+/** The value type expected by the `TextAreaInput` component. */
+export type TextAreaValue = string | null;
+/** The `onChange` signature expected by the `TextAreaInput` component. */
+export type TextAreaComponentOnChange = (
+  event: React.ChangeEvent<HTMLTextAreaElement>
 ) => void;
 
 /** The value type expected by the `RadioInput` component's `selectedValue` prop. */

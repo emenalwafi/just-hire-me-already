@@ -61,9 +61,9 @@ jest.useFakeTimers();
  * A mock array of `DropdownOption` objects used as test data.
  */
 const mockOptions: DropdownOption[] = [
-  { id: 1, label: "Apple" },
-  { id: 2, label: "Banana" },
-  { id: 3, label: "Mango" },
+  { value: '1', label: "Apple" },
+  { value: '2', label: "Banana" },
+  { value: '3', label: "Mango" },
 ];
 
 /**

@@ -154,7 +154,11 @@ const AuthenticationPage: React.FC = () => {
   useEffect(() => {
     const token = searchParams.get("verify");
     if (user) {
-      router.push("/");
+      if (user.role === "admin") {
+        router.push("/admin");
+      } else {
+        router.push("/");
+      }
       return;
     }
 

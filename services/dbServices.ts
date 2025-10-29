@@ -1,24 +1,25 @@
 import { openDB, DBSchema, IDBPDatabase } from "idb";
 import {
   Job,
-  JobApplicationConfiguration, // Updated type
-  JobPostingConfiguration, // New type
+  // Removed JobApplicationConfiguration (it's now part of Job)
+  JobPostingConfiguration,
+  JobSpecificApplicationConfiguration, // Added this specific type
   Candidate,
-  User, // New type
-  Application, // New type
+  User,
+  Application,
 } from "@/types/dbTypes";
 import {
   jobList,
-  jobConfiguration as initialAppConfig, // Rename imported variable
+  // Removed initialAppConfig (no longer separate)
+  initialJobPostingConfig, // Use the correct initial data
   candidateList,
-  initialJobPostingConfig, // Import the new initial posting config
 } from "@/data/initialData";
 import { v4 as uuidv4 } from "uuid"; // Import uuid for generating unique IDs
 
 /** The name of the IndexedDB database. */
 const DB_NAME = "JobAppData";
 /** The current version of the IndexedDB database schema. Increment version for schema changes. */
-const DB_VERSION = 2;
+const DB_VERSION = 3; // <<<< Incremented version for schema change
 /** Login link token validity duration in milliseconds (30 minutes). */
 const LOGIN_TOKEN_VALIDITY_MS = 30 * 60 * 1000;
 /** Key prefix for storing login tokens in sessionStorage. */
@@ -27,9 +28,10 @@ const LOGIN_TOKEN_PREFIX = "loginToken_";
 /**
  * Defines the schema structure for the Job Application IndexedDB database.
  * Uses `idb`'s `DBSchema` interface for type safety.
+ * (Updated jobConfiguration store)
  */
 interface JobAppDB extends DBSchema {
-  /** Object store for job postings. */
+  /** Object store for job postings. Includes application config now. */
   jobs: {
     key: string;
     value: Job;
@@ -37,12 +39,12 @@ interface JobAppDB extends DBSchema {
       "by-slug": string;
     };
   };
-  /** Object store for job configurations (application form and posting form). */
+  /** Object store for job configurations (now only posting form config). */
   jobConfiguration: {
-    /** The key type (using fixed strings like 'applicationConfig', 'postingConfig'). */
-    key: string;
-    /** The value type (either Application or Posting configuration). */
-    value: JobApplicationConfiguration | JobPostingConfiguration;
+    /** The key type (fixed string 'postingConfig'). */
+    key: string; // <<< Only postingConfig
+    /** The value type (only Posting configuration). */
+    value: JobPostingConfiguration; // <<< Only postingConfig
   };
   /** Object store for candidate profiles. */
   candidates: {
@@ -81,14 +83,11 @@ async function initDB(): Promise<IDBPDatabase<JobAppDB>> {
     /**
      * Called only when the database version changes or the database is first created.
      * Use this function to define the database schema (object stores and indexes).
-     * @param {IDBPDatabase<JobAppDB>} db - The database instance during upgrade.
-     * @param {number} oldVersion - The previous version number (0 if creating).
-     * @param {number | null} newVersion - The new version number being upgraded to.
-     * @param {IDBPTransaction<JobAppDB, ("jobs" | "jobConfiguration" | "candidates" | "users" | "applications")[], "versionchange">} transaction - The upgrade transaction.
      */
     upgrade(db, oldVersion, newVersion, transaction) {
       console.log(`Upgrading DB from version ${oldVersion} to ${newVersion}`);
 
+      // Create stores if they don't exist (relevant for initial creation)
       if (!db.objectStoreNames.contains("jobs")) {
         const jobStore = db.createObjectStore("jobs", { keyPath: "id" });
         jobStore.createIndex("by-slug", "slug");
@@ -96,6 +95,7 @@ async function initDB(): Promise<IDBPDatabase<JobAppDB>> {
       }
 
       if (!db.objectStoreNames.contains("jobConfiguration")) {
+        // Just create the store, no indexes needed for a single config item
         db.createObjectStore("jobConfiguration");
         console.log("Created 'jobConfiguration' object store.");
       }
@@ -120,28 +120,67 @@ async function initDB(): Promise<IDBPDatabase<JobAppDB>> {
         console.log("Created 'applications' object store with indexes.");
       }
 
+      // --- Migrations ---
       if (oldVersion < 2) {
-        console.log("Running migration logic for v2...");
+        // Migration from v1 to v2: Rename 'mainConfig' to 'applicationConfig'
+        console.log("Running migration logic for v1 to v2...");
+        // This logic might need adjustment if run again, but kept for history
         const configStore = transaction.objectStore("jobConfiguration");
         configStore
           .get("mainConfig")
           .then((oldConfig) => {
-            if (oldConfig) {
+            if (oldConfig && oldConfig.configType !== "posting") {
+              // Avoid overwriting if postingConfig exists somehow
               console.log("Migrating old 'mainConfig' key...");
-              const newAppConfig: JobApplicationConfiguration = {
-                ...(oldConfig as JobApplicationConfiguration),
-                id: "applicationConfig",
-                configType: "application",
-              };
-              configStore.put(newAppConfig, "applicationConfig");
+              // We'll delete this applicationConfig key in the next migration
+              configStore.put(oldConfig as unknown as JobPostingConfiguration, "applicationConfig");
               configStore.delete("mainConfig");
               console.log(
-                "Migration complete: 'mainConfig' -> 'applicationConfig'"
+                "Migration v1->v2 complete: 'mainConfig' -> 'applicationConfig'"
               );
             }
           })
-          .catch((err) => console.error("Error during config migration:", err));
+          .catch((err) =>
+            console.error("Error during v1->v2 config migration:", err)
+          );
       }
+
+      if (oldVersion < 3) {
+        // Migration from v2 to v3: Remove 'applicationConfig', ensure 'postingConfig' structure
+        console.log("Running migration logic for v2 to v3...");
+        const configStore = transaction.objectStore("jobConfiguration");
+        // Delete the old separate applicationConfig if it exists
+        configStore
+          .delete("applicationConfig")
+          .then(() =>
+            console.log("Removed old 'applicationConfig' key if present.")
+          )
+          .catch((err) =>
+            console.error("Error removing 'applicationConfig':", err)
+          );
+
+        // Check if postingConfig exists and has the correct shape (optional enhancement)
+        configStore
+          .get("postingConfig")
+          .then((existingPostingConfig) => {
+            if (
+              existingPostingConfig &&
+              existingPostingConfig.configType !== "posting"
+            ) {
+              console.warn(
+                "Existing 'postingConfig' has incorrect type. Overwriting with default."
+              );
+              // Force overwrite if structure is wrong - Seed logic will handle this better
+              configStore.delete("postingConfig");
+            } else if (existingPostingConfig) {
+              console.log("'postingConfig' already exists and seems valid.");
+            }
+          })
+          .catch((err) =>
+            console.error("Error checking existing 'postingConfig':", err)
+          );
+      }
+
       console.log("DB Upgrade finished");
     },
   });
@@ -151,13 +190,23 @@ async function initDB(): Promise<IDBPDatabase<JobAppDB>> {
 /**
  * Adds a new job posting to the 'jobs' object store.
  * Ensures the job has a UUID if an ID is not provided.
- * @param {Job} job - The job object to add.
+ * @param {Job} job - The job object to add (now includes applicationConfiguration).
  * @returns {Promise<string>} A promise that resolves with the key (ID) of the added job.
  */
 export async function addJob(job: Job): Promise<string> {
   const db = await initDB();
-  if (!job.id) job.id = uuidv4();
-  return db.add("jobs", job);
+  if (!job.id) job.id = uuidv4(); // Generate ID if needed
+  // Generate slug if needed (simple example, might need more robust slug generation)
+  if (!job.slug)
+    job.slug = job.title
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "");
+  // Add creation timestamp example
+  // job.createdAt = new Date().toISOString();
+  // job.updatedAt = job.createdAt;
+  console.log("Adding/Updating Job:", job);
+  return db.put("jobs", job); // Use put instead of add to allow updates
 }
 /**
  * Retrieves all job postings from the 'jobs' object store.
@@ -177,53 +226,52 @@ export async function getJobById(id: string): Promise<Job | undefined> {
   return db.get("jobs", id);
 }
 
-/**
- * Saves (adds or updates) the job application configuration.
- * Uses the fixed key 'applicationConfig'.
- * @param {JobApplicationConfiguration} config - The application configuration object.
- * @returns {Promise<string>} A promise resolving to the key ('applicationConfig').
- */
-export async function saveJobApplicationConfiguration(
-  config: JobApplicationConfiguration
-): Promise<string> {
-  const db = await initDB();
-  config.id = "applicationConfig";
-  config.configType = "application";
-  return db.put("jobConfiguration", config, "applicationConfig");
-}
-/**
- * Retrieves the job application configuration.
- * @returns {Promise<JobApplicationConfiguration | JobPostingConfiguration | undefined>} A promise resolving to the configuration object or undefined.
- */
-export async function getJobApplicationConfiguration(): Promise<
-  JobApplicationConfiguration | JobPostingConfiguration | undefined
-> {
-  const db = await initDB();
-  return db.get("jobConfiguration", "applicationConfig");
-}
+// --- Removed saveJobApplicationConfiguration ---
+// --- Removed getJobApplicationConfiguration ---
+
 /**
  * Saves (adds or updates) the job posting configuration.
  * Uses the fixed key 'postingConfig'.
  * @param {JobPostingConfiguration} config - The posting configuration object.
- * @returns {Promise<string>} A promise resolving to the key ('postingConfig').
+ * @returns {Promise<"postingConfig">} A promise resolving to the key ('postingConfig').
  */
 export async function saveJobPostingConfiguration(
   config: JobPostingConfiguration
 ): Promise<string> {
   const db = await initDB();
-  config.id = "postingConfig";
-  config.configType = "posting";
-  return db.put("jobConfiguration", config, "postingConfig");
+  // Ensure the ID and type are correct before saving
+  const configToSave: JobPostingConfiguration = {
+    ...config,
+    id: "postingConfig",
+    configType: "posting",
+  };
+  console.log("Saving Posting Configuration:", configToSave);
+  return db.put("jobConfiguration", configToSave, "postingConfig");
 }
 /**
  * Retrieves the job posting configuration.
- * @returns {Promise<JobPostingConfiguration | JobApplicationConfiguration | undefined>} A promise resolving to the configuration object or undefined.
+ * @returns {Promise<JobPostingConfiguration | undefined>} A promise resolving to the config object or undefined.
  */
 export async function getJobPostingConfiguration(): Promise<
-  JobPostingConfiguration | JobApplicationConfiguration | undefined
+  JobPostingConfiguration | undefined
 > {
   const db = await initDB();
-  return db.get("jobConfiguration", "postingConfig");
+  const config = await db.get("jobConfiguration", "postingConfig");
+  // Basic validation
+  if (
+    config &&
+    config.id === "postingConfig" &&
+    config.configType === "posting"
+  ) {
+    return config;
+  }
+  if (config) {
+    console.warn(
+      "Retrieved configuration for 'postingConfig' has incorrect id/type:",
+      config
+    );
+  }
+  return undefined; // Return undefined if not found or invalid
 }
 
 /**
@@ -256,6 +304,10 @@ export async function getCandidateById(
   const db = await initDB();
   return db.get("candidates", id);
 }
+
+// --- User and Application functions remain the same ---
+// (addUser, getUserByEmail, getUserById, addApplication, getApplicationsForJob,
+// getApplicationsForCandidate, getApplicationById, updateApplication)
 
 /**
  * Adds a new user to the database. Assumes the password in the user object
@@ -366,6 +418,7 @@ export async function updateApplication(
 /**
  * Populates the IndexedDB database with initial data if stores are empty.
  * Uses a single transaction. Includes hashing for seeded user passwords.
+ * (Updated seeding logic)
  * @returns {Promise<void>} A promise that resolves when seeding is complete or skipped, or rejects on error.
  */
 export async function seedInitialData(): Promise<void> {
@@ -384,65 +437,91 @@ export async function seedInitialData(): Promise<void> {
   };
 
   try {
+    // Seed Jobs (ensure they include applicationConfiguration)
     const jobCount = await stores.jobs.count();
     if (jobCount === 0 && jobList.data.length > 0) {
       console.log("Seeding JobList...");
       for (const job of jobList.data) {
-        await stores.jobs.add(job);
+        // Ensure required fields for the Job type are present
+        const jobToSeed: Job = {
+          id: job.id || uuidv4(),
+          slug:
+            job.slug ||
+            job.title
+              .toLowerCase()
+              .replace(/\s+/g, "-")
+              .replace(/[^a-z0-9-]/g, ""),
+          title: job.title,
+          jobType: job.jobType || "Full-time", // Add default if missing
+          description: job.description || "No description provided.",
+          candidatesNeeded: job.candidatesNeeded || 1,
+          status: job.status || "active",
+          salary_range: job.salary_range || {
+            min: null,
+            max: null,
+            currency: "IDR",
+            display_text: "Not specified",
+          },
+          list_card: job.list_card || {
+            badge: "New",
+            started_on_text: `Posted ${new Date().toLocaleDateString()}`,
+            cta: "Details",
+          },
+          applicationConfiguration: job.applicationConfiguration, // This should come from initialData.ts
+          // createdAt: new Date().toISOString(),
+          // updatedAt: new Date().toISOString(),
+        };
+        await stores.jobs.add(jobToSeed);
       }
       console.log("JobList seeded.");
     } else {
-      console.log("JobList data exists or is empty, skipping seed.");
-    }
-
-    const appConfig = await stores.jobConfiguration.get("applicationConfig");
-    if (!appConfig) {
-      console.log("Seeding Job Application Configuration...");
-      const configKey = "applicationConfig";
-      const appConfigToSave: JobApplicationConfiguration = {
-        ...initialAppConfig,
-        id: configKey,
-        configType: "application",
-      };
-      await stores.jobConfiguration.put(appConfigToSave, configKey);
-      console.log("Job Application Configuration seeded.");
-    } else {
-      console.log("Job Application Configuration exists, skipping seed.");
-    }
-
-    const postingConfig = await stores.jobConfiguration.get("postingConfig");
-    if (!postingConfig && initialJobPostingConfig) {
-      console.log("Seeding Job Posting Configuration...");
-      const configKey = "postingConfig";
-      const postingConfigToSave: JobPostingConfiguration = {
-        ...initialJobPostingConfig,
-        id: configKey,
-        configType: "posting",
-      };
-      await stores.jobConfiguration.put(postingConfigToSave, configKey);
-      console.log("Job Posting Configuration seeded.");
-    } else {
       console.log(
-        "Job Posting Configuration exists or not provided, skipping seed."
+        "JobList data exists or initial data is empty, skipping seed."
       );
     }
 
+    // --- Removed Application Configuration Seeding ---
+
+    // Seed Job Posting Configuration
+    const postingConfig = await stores.jobConfiguration.get("postingConfig");
+    if (!postingConfig && initialJobPostingConfig) {
+      console.log("Seeding Job Posting Configuration...");
+      const postingConfigToSave: JobPostingConfiguration = {
+        ...initialJobPostingConfig, // Spread fields from initialData
+        id: "postingConfig", // Set required properties
+        configType: "posting",
+      };
+      await stores.jobConfiguration.put(postingConfigToSave, "postingConfig");
+      console.log("Job Posting Configuration seeded.");
+    } else if (postingConfig) {
+      // Optional: Verify existing config structure here if needed
+      console.log("Job Posting Configuration exists, skipping seed.");
+    } else {
+      console.log(
+        "Initial Job Posting Configuration not provided, skipping seed."
+      );
+    }
+
+    // Seed Candidates
     const candidateCount = await stores.candidates.count();
     if (candidateCount === 0 && candidateList.data.length > 0) {
       console.log("Seeding Candidate List...");
       for (const candidate of candidateList.data) {
-        if (!candidate.id) candidate.id = uuidv4();
+        // Ensure ID is present (already done in initialData.ts using uuid)
         await stores.candidates.add(candidate);
       }
       console.log("Candidate List seeded.");
     } else {
-      console.log("Candidate List data exists or is empty, skipping seed.");
+      console.log(
+        "Candidate List data exists or initial data is empty, skipping seed."
+      );
     }
 
+    // Seed Users (Admin and potentially linked Candidate)
     const userCount = await stores.users.count();
     if (userCount === 0) {
       console.log("Seeding Default Admin User...");
-      const adminPasswordHash = await hashPassword("password");
+      const adminPasswordHash = await hashPassword("password"); // Example password
       const adminUser: User = {
         id: uuidv4(),
         email: "admin@example.com",
@@ -453,63 +532,86 @@ export async function seedInitialData(): Promise<void> {
       await stores.users.add(adminUser);
       console.log("Default Admin User seeded.");
 
+      // Seed sample candidate user only if candidates were seeded
       if (candidateList.data.length > 0 && candidateList.data[0].id) {
-        const candidatePasswordHash = await hashPassword("password");
+        console.log(
+          "Seeding Sample Candidate User (linked to first candidate)..."
+        );
+        const candidatePasswordHash = await hashPassword("password"); // Example password
         const candidateUser: User = {
           id: uuidv4(),
-          email: "nadia.putri@example.com",
-          name: "Nadia Putri",
+          // Use the email from the first sample candidate
+          email:
+            (candidateList.data[0].attributes.find(
+              (attr) => attr.key === "email"
+            )?.value as string) || "candidate@example.com",
+          name:
+            (candidateList.data[0].attributes.find(
+              (attr) => attr.key === "full_name"
+            )?.value as string) || "Sample Candidate",
           hashedPassword: candidatePasswordHash,
           role: "candidate",
-          candidateProfileId: candidateList.data[0].id,
+          candidateProfileId: candidateList.data[0].id, // Link to the first candidate's ID
         };
-        await stores.users.add(candidateUser);
-        console.log("Sample Candidate User seeded.");
+        // Check if email already exists before adding (unlikely here, but good practice)
+        try {
+          await stores.users.add(candidateUser);
+          console.log("Sample Candidate User seeded.");
+        } catch (userAddError) {
+          console.error("Failed to seed sample candidate user:", userAddError);
+        }
       }
     } else {
       console.log("Users data exists, skipping seed.");
     }
 
+    // Seed Sample Application (linking first job and first candidate)
     const appCount = await stores.applications.count();
-    if (
-      appCount === 0 &&
-      jobList.data.length > 0 &&
-      candidateList.data.length > 0 &&
-      jobList.data[0].id &&
-      candidateList.data[0].id
-    ) {
+    // Ensure both job and candidate lists have data before creating a link
+    const firstJobId = jobList.data[0]?.id;
+    const firstCandidateId = candidateList.data[0]?.id;
+
+    if (appCount === 0 && firstJobId && firstCandidateId) {
       console.log("Seeding Sample Application...");
       const sampleApp: Application = {
         id: uuidv4(),
-        jobId: jobList.data[0].id,
-        candidateId: candidateList.data[0].id,
+        jobId: firstJobId,
+        candidateId: firstCandidateId,
         applicationDate: new Date().toISOString(),
-        status: "applied",
+        status: "applied", // Initial status
       };
       await stores.applications.add(sampleApp);
       console.log("Sample Application seeded.");
+    } else if (appCount > 0) {
+      console.log("Applications data exists, skipping seed.");
     } else {
       console.log(
-        "Applications data exists or prerequisites missing, skipping seed."
+        "Prerequisites for seeding sample application missing (no jobs or candidates in initial data), skipping seed."
       );
     }
 
     await tx.done;
-    console.log("Seeding complete.");
+    console.log("Seeding transaction complete.");
   } catch (error) {
     console.error("Error during seeding transaction:", error);
-    if (tx.error) {
-      console.error("Transaction error details:", tx.error);
+    try {
+      // Attempt to abort the transaction on error
+      tx.abort();
+      console.log("Seeding transaction aborted due to error.");
+    } catch (abortError) {
+      console.error("Error aborting seeding transaction:", abortError);
     }
-    console.log("Seeding failed, transaction aborted.");
   }
 }
+
+// --- Auth functions remain the same ---
+// (loginUser, registerUser, requestLoginLink, verifyLoginToken, hashPassword, verifyPassword)
 
 /**
  * Attempts to log in a user with email and password. Verifies the password against the stored hash.
  * @param {string} email - The user's email.
  * @param {string} plainPassword - The user's plain text password.
- * @returns {Promise<User>} The User object (excluding the hashedPassword) if login is successful.
+ * @returns {Promise<Omit<User, "hashedPassword">>} The User object (excluding the hashedPassword) if login is successful.
  * @throws {Error} If email is not found, password does not match, or the user account is improperly configured.
  */
 export async function loginUser(
@@ -586,8 +688,8 @@ export async function registerUser(
  * Simulates requesting a login link. Checks if the user exists.
  * In a real app, this would generate a token and trigger an email.
  * @param email The email address to send the link to.
- * @returns The User object (without hash) if the email exists.
- * @throws Error if the email is not found.
+ * @returns The token generated for the login link.
+ * @throws Error if the email is not found or session storage is unavailable.
  */
 export async function requestLoginLink(email: string): Promise<string> {
   if (typeof window === "undefined" || typeof sessionStorage === "undefined") {
@@ -612,6 +714,8 @@ export async function requestLoginLink(email: string): Promise<string> {
     console.log(
       `SIMULATING sending login link for user: ${user.email}. Token: ${token}`
     );
+    // In a real app, you would send an email containing a link like:
+    // https://yourapp.com/login?verify=${token}
     return token;
   } catch (error) {
     console.error("Error storing login token in sessionStorage:", error);
@@ -637,6 +741,7 @@ export async function verifyLoginToken(
   const storageKey = `${LOGIN_TOKEN_PREFIX}${token}`;
   const tokenDataString = sessionStorage.getItem(storageKey);
 
+  // Remove the token after attempting to retrieve it, regardless of validity
   sessionStorage.removeItem(storageKey);
 
   if (!tokenDataString) {
@@ -653,9 +758,10 @@ export async function verifyLoginToken(
 
     if (Date.now() >= tokenData.expiresAt) {
       console.warn("Token verification failed: Token expired.");
-      return null;
+      return null; // Consider throwing specific error for expired token if needed
     }
 
+    // Token is valid and not expired, fetch the user
     const user = await getUserById(tokenData.userId);
     if (!user) {
       console.error(
@@ -665,11 +771,12 @@ export async function verifyLoginToken(
     }
 
     console.log(`Token verification successful for user: ${user.email}`);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { hashedPassword, ...userWithoutPassword } = user;
     return userWithoutPassword;
   } catch (error) {
     console.error("Error during token verification:", error);
-    return null;
+    return null; // Return null on parsing errors or other exceptions
   }
 }
 
@@ -695,9 +802,7 @@ export async function hashPassword(password: string): Promise<string> {
   const data = encoder.encode(password);
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);
   const hashHex = bufferToHex(hashBuffer);
-  console.log(
-    `Hashing password "${password}" to ${hashHex.substring(0, 10)}...`
-  );
+  // console.log(`Hashing password "${password}" to ${hashHex.substring(0, 10)}...`); // Optional logging
   return hashHex;
 }
 
@@ -711,7 +816,7 @@ export async function verifyPassword(
   plainPassword: string,
   storedHash: string
 ): Promise<boolean> {
-  if (!storedHash) return false;
+  if (!storedHash) return false; // Cannot verify if no hash is stored
   const hashOfInput = await hashPassword(plainPassword);
   return hashOfInput === storedHash;
 }

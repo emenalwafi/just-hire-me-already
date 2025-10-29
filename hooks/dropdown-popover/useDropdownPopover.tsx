@@ -12,7 +12,7 @@ import { createPortal } from "react-dom";
  */
 export interface DropdownOption {
   /** A unique identifier for the option. */
-  id: string | number;
+  value: string;
   /** The text to be displayed for the option. */
   label: string;
 }
@@ -143,7 +143,7 @@ export function useDropdownPopover({
         <div className="self-stretch max-h-60 overflow-y-auto">
           {filteredOptions.length > 0 ? (
             filteredOptions.map((option) => {
-              const isSelected = selectedValue === option.id;
+              const isSelected = selectedValue === option.value;
               let itemClasses =
                 "self-stretch w-full px-4 py-2 inline-flex justify-start items-center gap-2 text-left transition-colors cursor-pointer";
               itemClasses += isSelected
@@ -158,7 +158,7 @@ export function useDropdownPopover({
 
               return (
                 <div
-                  key={option.id}
+                  key={option.value}
                   role="option"
                   aria-selected={isSelected}
                   className={itemClasses}

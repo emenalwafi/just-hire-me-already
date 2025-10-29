@@ -3,9 +3,11 @@
 import React, { useState } from "react";
 import Chip from "@/components/input/chip/Chip";
 import Input from "@/components/input/Input";
+import { UilDollarSignAlt, UilLink } from "@iconscout/react-unicons";
 import {
   InputConfig,
   TextInputConfig,
+  TextAreaInputConfig,
   RadioInputConfig,
   DropdownInputConfig,
   DatePickerConfig,
@@ -34,13 +36,13 @@ const pronounOptions = [
  * @type {DropdownOption[]}
  */
 const domicileOptions: DropdownOption[] = [
-  { id: "aceh_barat", label: "Kabupaten Aceh Barat - Aceh" },
-  { id: "aceh_besar", label: "Kabupaten Aceh Besar - Aceh" },
-  { id: "aceh_selatan", label: "Kabupaten Aceh Selatan - Aceh" },
-  { id: "jakarta_1", label: "Jakarta Pusat - DKI Jakarta" },
-  { id: "jakarta_2", label: "Jakarta Selatan - DKI Jakarta" },
-  { id: "bandung_1", label: "Kota Bandung - Jawa Barat" },
-  { id: "bogor_1", label: "Kota Bogor - Jawa Barat" },
+  { value: "aceh_barat", label: "Kabupaten Aceh Barat - Aceh" },
+  { value: "aceh_besar", label: "Kabupaten Aceh Besar - Aceh" },
+  { value: "aceh_selatan", label: "Kabupaten Aceh Selatan - Aceh" },
+  { value: "jakarta_1", label: "Jakarta Pusat - DKI Jakarta" },
+  { value: "jakarta_2", label: "Jakarta Selatan - DKI Jakarta" },
+  { value: "bandung_1", label: "Kota Bandung - Jawa Barat" },
+  { value: "bogor_1", label: "Kota Bogor - Jawa Barat" },
 ];
 
 /** Base configuration for a 'text' input for Full Name. */
@@ -58,6 +60,15 @@ const baseEmailConfig: TextInputConfig = {
   label: "Email",
   placeholder: "Enter email",
   required: true,
+};
+/** Base configuration for an 'text-area' input. */
+const baseTextAreaConfig: TextAreaInputConfig = {
+  type: "textarea",
+  name: "description",
+  label: "Description",
+  placeholder: "Enter description",
+  required: true,
+  rows: 4, // Example: default 4 rows
 };
 /** Base configuration for a 'password' input. */
 const basePasswordConfig: TextInputConfig = {
@@ -100,6 +111,24 @@ const basePhoneConfig: PhoneNumberInputConfig = {
   placeholder: "81xxxxxxx",
   required: true,
   defaultCountryIso: "ID",
+};
+/** Base configuration for a 'text' input Prefix. */
+const baseSalaryConfig: TextInputConfig = {
+  type: "number", // Use number type
+  name: "salary",
+  label: "Salary",
+  placeholder: "Enter amount",
+  prefixCustom: <span className="font-bold color-neutral-600">Rp</span>, // Icon prefix
+  required: false,
+};
+/** String configuration for a 'text' input Prefix. */
+const baseLinkConfig: TextInputConfig = {
+  type: "url", // Use url type
+  name: "website",
+  label: "Website",
+  placeholder: "yourwebsite.com",
+  prefixCustom: "https://", // String prefix
+  required: false,
 };
 
 /**
@@ -167,6 +196,51 @@ const inputFields: InputFieldStateExample[] = [
     title: "Password",
     config: basePasswordConfig,
     stateKey: "passwordBasic",
+  },
+  {
+    id: "salary-prefix",
+    title: "Number (Icon Prefix)",
+    config: baseSalaryConfig,
+    stateKey: "salaryPrefix",
+  },
+  {
+    id: "link-prefix",
+    title: "URL (String Prefix)",
+    config: baseLinkConfig,
+    stateKey: "linkPrefix",
+  },
+  {
+    id: "salary-prefix-disabled",
+    title: "Number (Prefix Disabled)",
+    config: baseSalaryConfig,
+    stateKey: "salaryPrefixDisabled",
+    stateProps: { disabled: true },
+  },
+  {
+    id: "textarea-rest",
+    title: "Textarea (Rest)",
+    config: baseTextAreaConfig,
+    stateKey: "textAreaRest",
+  },
+  {
+    id: "textarea-filled",
+    title: "Textarea (Filled)",
+    config: baseTextAreaConfig,
+    stateKey: "textAreaFilled",
+  },
+  {
+    id: "textarea-error",
+    title: "Textarea (Error)",
+    config: baseTextAreaConfig,
+    stateKey: "textAreaError",
+    stateProps: { error: "Description cannot be empty" },
+  },
+  {
+    id: "textarea-disabled",
+    title: "Textarea (Disabled)",
+    config: baseTextAreaConfig,
+    stateKey: "textAreaDisabled",
+    stateProps: { disabled: true },
   },
   // Radio Inputs
   {
@@ -324,6 +398,11 @@ export default function Home() {
     nameDisabled: "Cannot Edit",
     emailSuccess: "valid@email.com",
     passwordBasic: null,
+    textAreaRest: null,
+    textAreaFilled:
+      "This is some pre-filled text.\nIt can span multiple lines.",
+    textAreaError: null,
+    textAreaDisabled: "This content cannot be edited.",
     pronounRest: null,
     pronounSelected: "male",
     pronounError: null,

@@ -25,26 +25,9 @@ export interface ListCard {
 }
 
 /**
- * Represents a job posting.
- */
-export interface Job {
-  /** Unique identifier for the job posting. */
-  id: string; // Will be the key
-  /** URL-friendly identifier for the job posting. */
-  slug: string;
-  /** The title of the job. */
-  title: string;
-  /** The current status of the job posting (e.g., "open", "closed", "draft"). */
-  status: string;
-  /** The salary range offered for the job. */
-  salary_range: SalaryRange;
-  /** Metadata for displaying the job in a list card format. */
-  list_card: ListCard;
-}
-
-/**
  * Defines the structure and validation rules for a single field
- * within a job application form configuration.
+ * within a specific job's application form configuration.
+ * (Updated based on user input, now includes input type)
  */
 export interface JobApplicationFieldConfig {
   /** The unique key or identifier for this field (e.g., "fullName", "resumeFile"). */
@@ -54,11 +37,32 @@ export interface JobApplicationFieldConfig {
     /** Whether this field is mandatory. */
     required: boolean;
   };
+  isShown: boolean; // Whether to display this field in the application form
+  label: string; // Label shown to the candidate
+  order: number; // Display order in the form section
+  // Add input type to guide rendering the application form
+  type?: // Standard HTML input types + custom ones
+  | "text"
+    | "email"
+    | "url"
+    | "password" // (Less common for applications)
+    | "number"
+    | "search" // (Less common for applications)
+    | "textarea"
+    | "radio" // Requires options in config? Or predefined?
+    | "dropdown" // Requires options in config? Or predefined?
+    | "date"
+    | "phone"
+    | "file"; // For resume/photo uploads
+  // Optional: Add options if type is radio/dropdown
+  options?: { value: string; label: string }[];
+  placeholder?: string; // Optional placeholder for the input
 }
 
 /**
  * Represents a section within a job application form configuration,
  * containing a title and a list of fields.
+ * (Fields now use updated JobApplicationFieldConfig)
  */
 export interface JobApplicationSection {
   /** The title displayed for this section of the form (e.g., "Personal Information", "Work Experience"). */
@@ -68,44 +72,73 @@ export interface JobApplicationSection {
 }
 
 /**
- * Represents the configuration for a job's **application** form.
+ * Represents the configuration for a *specific job's* application form.
+ * This structure will be *stored within the Job object itself*.
  */
-export interface JobApplicationConfiguration {
-  /** Unique identifier for this configuration document (use fixed key "applicationConfig"). */
-  id: "applicationConfig";
-  /** Type identifier for distinguishing configuration types. */
-  configType: "application";
-  /** Configuration details for the job's application form. */
-  application_form: {
-    /** An array of sections that make up the application form. */
-    sections: JobApplicationSection[];
-  };
+export interface JobSpecificApplicationConfiguration {
+  sections: JobApplicationSection[];
 }
 
+// --- Job Posting Configuration (Admin Form Definition) ---
+
 /**
- * Represents the configuration for a field when an admin is **posting** a job.
+ * Represents the configuration for a field when an admin is *posting* a job.
+ * (Includes type for the nested config editor)
  */
 export interface JobPostingFieldConfig {
-  key: string; // e.g., 'title', 'description', 'salaryMin', 'salaryMax', 'location'
-  label: string; // e.g., 'Job Title', 'Job Description'
-  type: "text" | "textarea" | "number" | "currency" | "select"; // Input type hint
+  key: string; // e.g., 'title', 'jobType', 'applicationConfig'
+  label: string;
+  // Added 'applicationConfigEditor' type
+  type:
+    | "text"
+    | "textarea"
+    | "number"
+    | "currency" // Could be treated as number with specific formatting/validation
+    | "select"
+    | "applicationConfigEditor"; // Special type for the nested config
   required: boolean;
   options?: { value: string; label: string }[]; // For select types
   placeholder?: string;
-  // Add other relevant properties like validation rules, order etc.
+  // Default value for application config editor
+  defaultValue?: JobSpecificApplicationConfiguration;
+  [key: string]: unknown;
 }
 
 /**
- * Represents the configuration for the form used by admins to **post** a new job.
+ * Represents the configuration for the form used by admins to *post* a new job.
+ * Stored in IndexedDB under 'jobConfiguration' with id 'postingConfig'.
  */
 export interface JobPostingConfiguration {
-  /** Unique identifier for this configuration document (use fixed key "postingConfig"). */
   id: "postingConfig";
-  /** Type identifier for distinguishing configuration types. */
   configType: "posting";
-  /** An array defining the fields in the job posting form. */
   fields: JobPostingFieldConfig[];
 }
+
+// --- Job Object (Stores the outcome of the posting form) ---
+
+/**
+ * Represents a job posting.
+ * (Includes necessary fields from the posting form
+ * and the specific application configuration for this job)
+ */
+export interface Job {
+  id: string; // Key path
+  slug: string; // URL-friendly identifier
+  title: string; // From posting form (Job name)
+  jobType?: string; // From posting form
+  description?: string; // From posting form
+  candidatesNeeded?: number; // From posting form
+  status: "active" | "draft" | "closed"; // Controlled via posting form/management
+  salary_range: SalaryRange; // From posting form (min/max)
+  list_card: ListCard; // Generated or set during creation/update
+  // Store the specific application configuration *for this job*
+  applicationConfiguration: JobSpecificApplicationConfiguration;
+  // Optional: Add creation/update timestamps if needed
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// --- Candidate, User, Application (Keep as previously defined) ---
 
 /**
  * Represents a single attribute or piece of information about a candidate.
