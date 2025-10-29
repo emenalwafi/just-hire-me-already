@@ -288,13 +288,13 @@ export const candidateList: { data: Candidate[] } = {
         {
           key: "full_name",
           label: "Full Name",
-          value: "Nadia Putri",
+          value: "Muhammad Nashih Al Wafi",
           order: 1,
         },
         {
           key: "email",
           label: "Email",
-          value: "nadia.putri@example.com",
+          value: "wafi@example.com",
           order: 2,
         },
         {

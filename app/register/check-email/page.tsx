@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { logout } from "@/store/authSlice";
 import { AppDispatch, RootState } from "@/store/store";
@@ -50,7 +50,11 @@ const CheckEmailPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, router, user, dispatch]); // Added user and dispatch
 
-  return <CheckEmailDisplay email={email} context="register" />;
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <CheckEmailDisplay email={email} context="login" />
+    </Suspense>
+  );
 };
 
 export default CheckEmailPage;
